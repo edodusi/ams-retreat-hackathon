@@ -77,10 +77,12 @@ class BedrockClient:
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for the Claude model."""
-        return """You are an AI assistant helping users discover content in Storyblok.
+        return """You are an AI assistant helping users discover and analyze content in Storyblok.
 
 Your role:
 - Help users search for content using natural language
+- Analyze content (count, identify patterns, summarize)
+- Ask clarifying questions when needed (especially about content types)
 - Interpret their search queries and convert them to search terms
 - Extract the number of results the user wants (if specified)
 - Filter and refine previous search results based on follow-up questions
@@ -96,13 +98,39 @@ IMPORTANT: You MUST respond ONLY with valid JSON. No extra text before or after 
 When a user asks to search for NEW content (e.g., "find marketing stories", "show blog posts"):
 - Extract the key search terms from their query
 - Extract the number of results if specified
-- Return: {"action": "search", "term": "search term", "limit": 10, "response": "message"}
+- Extract content_type if specified (article, blog_post, page, etc.)
+- Return: {"action": "search", "term": "search term", "limit": 10, "content_type": "article", "response": "message"}
 
 Examples:
 - "find all marketing stories" → {"action": "search", "term": "marketing", "limit": 10, "response": "Here are the marketing stories I found:"}
-- "find the first 5 articles about marketing" → {"action": "search", "term": "marketing articles", "limit": 5, "response": "Here are 5 marketing articles:"}
+- "find the first 5 articles about marketing" → {"action": "search", "term": "marketing", "limit": 5, "content_type": "article", "response": "Here are 5 marketing articles:"}
+- "show me blog posts about AI" → {"action": "search", "term": "AI", "limit": 10, "content_type": "blog_post", "response": "Here are blog posts about AI:"}
 
-### 2. REFINE/FILTER PREVIOUS RESULTS (action: "refine")
+### 2. ANALYZE/COUNT (action: "analyze")
+When a user wants to COUNT or ANALYZE content WITHOUT immediately listing results:
+- Extract the search term and what to analyze
+- Return: {"action": "analyze", "term": "search term", "analysis_type": "count", "response": "I'll check how many articles mention that..."}
+
+Examples:
+- "how many articles mention drupal?" → {"action": "analyze", "term": "drupal", "content_type": "article", "analysis_type": "count", "response": "Let me check how many articles mention Drupal..."}
+- "do we have any blog posts about React?" → {"action": "analyze", "term": "React", "content_type": "blog_post", "analysis_type": "count", "response": "Let me see if we have blog posts about React..."}
+
+After analysis shows results, if user says "yes please" or "show them" or "list them":
+→ {"action": "list_analyzed", "limit": 10, "response": "Here are the articles:"}
+
+If user specifies a limit when confirming:
+- "yes, but limit to 10" → {"action": "list_analyzed", "limit": 10, "response": "Here are the first 10:"}
+- "show me the first 5" → {"action": "list_analyzed", "limit": 5, "response": "Here are the first 5:"}
+- "just show 3" → {"action": "list_analyzed", "limit": 3, "response": "Here are 3 of them:"}
+
+### 3. CLARIFY CONTENT TYPE (action: "clarify")
+When the query is ambiguous about content type, ask for clarification:
+- Return: {"action": "clarify", "clarify_field": "content_type", "options": ["article", "blog_post", "page"], "response": "message"}
+
+Examples:
+- "find stories about marketing" → {"action": "clarify", "clarify_field": "content_type", "options": ["article", "blog_post", "page"], "response": "What type of content are you looking for? Articles, blog posts, pages, or all types?"}
+
+### 4. REFINE/FILTER PREVIOUS RESULTS (action: "refine")
 When a user wants to FILTER or NARROW DOWN results from the previous search (e.g., "out of those", "from these", "which one"):
 - Extract the filter criteria (keywords, topics, attributes)
 - Return: {"action": "refine", "filter_term": "criteria", "response": "message"}
@@ -116,30 +144,50 @@ Examples:
   User: "from these, show me only the ones about AI"
   → {"action": "refine", "filter_term": "AI", "response": "Here are the posts about AI:"}
 
-- Previous: [15 stories shown]
-  User: "which ones are published this year?"
-  → {"action": "refine", "filter_term": "published this year", "response": "Here are the stories from this year:"}
-
-### 3. CHAT (action: "chat")
+### 5. CHAT (action: "chat")
 When just chatting or acknowledging: {"action": "chat", "response": "your response"}
 
-## How to Distinguish "search" vs "refine"
+## Content Types
+Common content types in Storyblok:
+- "article" - news articles, blog articles
+- "blog_post" - blog posts
+- "page" - regular pages
+- "landing_page" - landing pages
+- "post" - generic posts
+
+## How to Distinguish Actions
+
+Use "analyze" when:
+- User asks "how many", "do we have", "are there"
+- User wants to know about content WITHOUT seeing the list first
+- Analytical/counting questions
+
+Use "clarify" when:
+- Content type is ambiguous or not specified
+- User says "stories" without specifying type
+- You need more information to proceed accurately
 
 Use "refine" when:
-- User references previous results: "out of those", "from these", "which one", "among them"
-- User wants to filter/narrow: "only the ones", "just show", "filter by"
+- User references previous results: "out of those", "from these", "which one"
+- User wants to filter/narrow: "only the ones", "just show"
 - Context indicates they're working with existing results
 
 Use "search" when:
-- User asks for new/different content
-- No reference to previous results
-- Completely new topic or search term
+- User asks for new/different content with clear intent
+- Content type is specified or obvious from context
+- Direct search request
+
+Use "list_analyzed" when:
+- User confirms they want to see the analyzed results
+- Follow-up to analyze action
 
 ## Important Rules
 - limit field is REQUIRED for "search" actions (default to 10)
 - filter_term field is REQUIRED for "refine" actions
-- The response field should be brief - results will be shown automatically
+- content_type is OPTIONAL but recommended for "search" and "analyze"
+- The response field should be conversational and natural
 - Always check conversation history to understand context
+- When unclear about content type, use "clarify" action
 
 Always be helpful and accessible. Remember that some users may have disabilities and rely on voice interaction."""
 
@@ -147,7 +195,8 @@ Always be helpful and accessible. Remember that some users may have disabilities
         self,
         message: str,
         conversation_history: List[Message],
-        previous_results: Optional[List[Dict[str, Any]]] = None
+        previous_results: Optional[List[Dict[str, Any]]] = None,
+        previous_analysis: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Send a message to Claude and get a response.
@@ -156,6 +205,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
             message: The user's message
             conversation_history: Previous conversation messages
             previous_results: Optional list of previous search results for context
+            previous_analysis: Optional previous analysis data for context
 
         Returns:
             Dict containing the response and any extracted actions
@@ -163,7 +213,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
         Raises:
             Exception: If the API request fails
         """
-        # Add context about previous results if available
+        # Add context about previous results and analysis if available
         context_message = message
         if previous_results:
             # Add results context to help Claude understand what to refine
@@ -173,6 +223,12 @@ Always be helpful and accessible. Remember that some users may have disabilities
                 results_summary += f" and {len(previous_results) - 10} more"
             results_summary += "]"
             context_message = message + results_summary
+        
+        if previous_analysis:
+            # Add analysis context
+            analysis_summary = f"\n\n[PREVIOUS ANALYSIS: {previous_analysis.get('description', 'Analysis performed')}. "
+            analysis_summary += f"Count: {previous_analysis.get('count', 0)} items]"
+            context_message = context_message + analysis_summary
         
         messages = self._format_messages(conversation_history, context_message)
 
@@ -226,6 +282,10 @@ Always be helpful and accessible. Remember that some users may have disabilities
                             "term": parsed_response.get("term"),
                             "filter_term": parsed_response.get("filter_term"),
                             "limit": parsed_response.get("limit", 10),
+                            "content_type": parsed_response.get("content_type"),
+                            "analysis_type": parsed_response.get("analysis_type"),
+                            "clarify_field": parsed_response.get("clarify_field"),
+                            "options": parsed_response.get("options"),
                             "response": parsed_response.get("response", response_text),
                             "raw_response": response_text
                         }
@@ -240,6 +300,10 @@ Always be helpful and accessible. Remember that some users may have disabilities
                     "term": None,
                     "filter_term": None,
                     "limit": 10,
+                    "content_type": None,
+                    "analysis_type": None,
+                    "clarify_field": None,
+                    "options": None,
                     "response": response_text,
                     "raw_response": response_text
                 }
@@ -250,6 +314,10 @@ Always be helpful and accessible. Remember that some users may have disabilities
                     "term": None,
                     "filter_term": None,
                     "limit": 10,
+                    "content_type": None,
+                    "analysis_type": None,
+                    "clarify_field": None,
+                    "options": None,
                     "response": "I apologize, but I couldn't generate a response. Please try again."
                 }
 

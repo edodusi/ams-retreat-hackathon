@@ -122,10 +122,29 @@ paths:
                     - role: assistant
                       content: "I found 23 technology blog posts."
               casualChat:
-                summary: Casual conversation
-                value:
-                  message: "Hello"
-                  conversation_history: []
+               summary: Casual conversation
+               value:
+                message: "Hello! How are you?"
+                conversation_history: []
+              analyticalQuery:
+               summary: Analytical query (count)
+               value:
+                message: "how many articles mention drupal?"
+                conversation_history: []
+              contentTypeSearch:
+               summary: Search with specific content type
+               value:
+                message: "find 5 articles about react"
+                conversation_history: []
+              listAnalyzed:
+               summary: List previously analyzed results
+               value:
+                message: "yes please show them"
+                conversation_history:
+                 - role: user
+                   content: "how many blog posts mention vue?"
+                 - role: assistant
+                   content: "I found 4 blog posts that mention vue. Would you like me to list them?"
       responses:
         '200':
           description: Successful conversation response
@@ -201,11 +220,34 @@ paths:
                       total: 5
                     conversation_id: null
                 chatOnly:
-                  summary: Response without search
-                  value:
-                    message: "Hello! How can I help you search for content today?"
-                    results: null
-                    conversation_id: null
+                 summary: Response without search
+                 value:
+                  message: "Hello! I'm here to help you find content in Storyblok. What would you like to search for?"
+                  action: "chat"
+                  results: null
+                  conversation_id: null
+                  analysis: null
+                analysisResponse:
+                 summary: Response with analysis (count)
+                 value:
+                  message: "I found 13 articles that mention Drupal. Would you like me to list them?"
+                  action: "analyze"
+                  results: null
+                  analysis:
+                   description: "Analyzed drupal (article)"
+                   count: 13
+                   search_term: "drupal"
+                   content_type: "article"
+                   analysis_type: "count"
+                  conversation_id: null
+                clarificationResponse:
+                 summary: Response requesting clarification
+                 value:
+                  message: "What type of content are you looking for? Articles, blog posts, pages, or all types?"
+                  action: "clarify"
+                  results: null
+                  conversation_id: null
+                  analysis: null
         '400':
           description: Bad request
           content:
@@ -410,50 +452,58 @@ components:
         - slug
         - story_id
       properties:
-        body:
-          type: string
-          description: Story body/content as text from Strata API
-          example: "A comprehensive guide to modern marketing tactics and trends for 2025..."
-        cursor:
-          type: integer
-          description: Cursor position for pagination
-          example: 0
-        name:
-          type: string
-          description: Story name/title
-          example: "Marketing Strategy 2025"
-        slug:
-          type: string
-          description: Story slug/path
-          example: "blog/marketing-strategy-2025"
-        story_id:
-          type: integer
-          description: Unique Storyblok story identifier
-          example: 12345
-        full_story:
+       body:
+        type: string
+        description: Story body/content as text from Strata API
+        example: "This is a comprehensive guide to modern web development..."
+       cursor:
+        type: integer
+        description: Cursor position for pagination
+        example: 0
+       name:
+        type: string
+        description: Story name/title
+        example: "Web Development Guide 2024"
+       slug:
+        type: string
+        description: Story slug/path
+        example: "web-development-guide-2024"
+       story_id:
+        type: integer
+        description: Unique Storyblok story identifier
+        example: 123456
+       content_type:
+        type: string
+        nullable: true
+        description: Content type/component of the story (e.g., article, blog_post, page)
+        example: "article"
+       full_story:
           type: object
           nullable: true
           description: |
             Full story data fetched from Storyblok API (when available).
             Contains complete story information including content, metadata, and all fields.
           properties:
-            id:
-              type: integer
-              description: Story ID
-            name:
-              type: string
-              description: Story name
-            content:
-              type: object
-              description: Story content structure
-            published_at:
-              type: string
-              format: date-time
-              description: Publication timestamp
-            created_at:
-              type: string
-              format: date-time
-              description: Creation timestamp
+           id:
+            type: integer
+            description: Story ID
+           name:
+            type: string
+            description: Story name
+           content:
+            type: object
+            description: Story content structure
+           content_type:
+            type: string
+            description: Story content type
+           published_at:
+            type: string
+            format: date-time
+            description: Publication timestamp
+           created_at:
+            type: string
+            format: date-time
+            description: Creation timestamp
 
     SearchResults:
       type: object
@@ -473,19 +523,51 @@ components:
       required:
         - message
       properties:
-        message:
+       message:
+        type: string
+        description: Assistant's conversational response
+        example: "Here are the marketing articles I found:"
+       results:
+        allOf:
+         - $ref: '#/components/schemas/SearchResults'
+        nullable: true
+        description: Search results if a search was performed
+       conversation_id:
+        type: string
+        nullable: true
+        description: Conversation session ID (reserved for future use)
+       action:
+        type: string
+        nullable: true
+        enum: [search, analyze, list_analyzed, refine, clarify, chat]
+        description: Action type performed by the assistant
+        example: "search"
+       analysis:
+        type: object
+        nullable: true
+        description: Analysis data (e.g., counts, statistics)
+        properties:
+         description:
           type: string
-          description: Assistant's conversational response
-          example: "I found 15 marketing articles. Here are the top results:"
-        results:
-          allOf:
-            - $ref: '#/components/schemas/SearchResults'
-          nullable: true
-          description: Search results if a search was performed
-        conversation_id:
+          description: Human-readable description of the analysis
+          example: "Analyzed drupal (article)"
+         count:
+          type: integer
+          description: Number of items found
+          example: 13
+         search_term:
+          type: string
+          description: Term that was analyzed
+          example: "drupal"
+         content_type:
           type: string
           nullable: true
-          description: Conversation session ID (reserved for future use)
+          description: Content type that was analyzed
+          example: "article"
+         analysis_type:
+          type: string
+          description: Type of analysis performed
+          example: "count"
 
     ErrorResponse:
       type: object

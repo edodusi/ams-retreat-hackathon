@@ -29,6 +29,8 @@ import hashlib
 conversation_contexts: Dict[str, List[Dict[str, Any]]] = {}
 # Store conversation ID mapping for better tracking
 conversation_id_contexts: Dict[str, List[Dict[str, Any]]] = {}
+# Store analysis results per session
+conversation_analyses: Dict[str, Dict[str, Any]] = {}
 
 # Configure logging
 logging.basicConfig(
@@ -157,14 +159,19 @@ async def conversation(request: ConversationRequest):
         logger.info(f">>> Session key: {session_key}")
         logger.info(f">>> Conversation history messages: {len(conversation_history)}")
         
-        # Extract previous results from session context
+        # Extract previous results and analysis from session context
         previous_results = None
+        previous_analysis = None
         if session_key in conversation_contexts and conversation_contexts[session_key]:
             previous_results = conversation_contexts[session_key]
             logger.info(f">>> Found {len(previous_results)} previous results in session context")
         else:
             logger.info(f">>> No previous results found for session: {session_key}")
             logger.info(f">>> Available sessions: {list(conversation_contexts.keys())}")
+        
+        if session_key in conversation_analyses and conversation_analyses[session_key]:
+            previous_analysis = conversation_analyses[session_key]
+            logger.info(f">>> Found previous analysis in session: {previous_analysis.get('description', 'Unknown')}")
         
         # Send message to Claude (run sync boto3 call in thread pool)
         try:
@@ -174,7 +181,8 @@ async def conversation(request: ConversationRequest):
                 lambda: bedrock_client.converse(
                     message=request.message,
                     conversation_history=conversation_history,
-                    previous_results=previous_results
+                    previous_results=previous_results,
+                    previous_analysis=previous_analysis
                 )
             )
         except Exception as e:
@@ -190,34 +198,133 @@ async def conversation(request: ConversationRequest):
         search_term = claude_response.get("term")
         filter_term = claude_response.get("filter_term")
         search_limit = claude_response.get("limit", 10)  # Default to 10 if not specified
+        content_type = claude_response.get("content_type")
+        analysis_type = claude_response.get("analysis_type")
+        clarify_field = claude_response.get("clarify_field")
+        clarify_options = claude_response.get("options")
         
-        logger.info(f"Claude response - Action: {action}, Term: {search_term}, Filter: {filter_term}, Limit: {search_limit}, Message length: {len(response_text)}")
+        logger.info(f"Claude response - Action: {action}, Term: {search_term}, Filter: {filter_term}, Limit: {search_limit}, ContentType: {content_type}, Message length: {len(response_text)}")
         
         # Initialize response
         conversation_response = ConversationResponse(
             message=response_text,
-            results=None
+            results=None,
+            action=action
         )
         
-        # If action is search, query Storyblok (async httpx call)
-        if action == "search" and search_term:
-            logger.info(f">>> PERFORMING SEARCH with term: '{search_term}', limit: {search_limit}")
+        # Handle different action types
+        if action == "clarify":
+            # Ask for clarification - no search needed
+            logger.info(f">>> CLARIFICATION NEEDED: {clarify_field}")
+            conversation_response.message = response_text
+            # Don't clear context, keep previous results available
+            
+        elif action == "analyze" and search_term:
+            # Perform search but present as analysis
+            logger.info(f">>> ANALYZING with term: '{search_term}', type: '{content_type}'")
+            try:
+                search_results = await storyblok_client.search(term=search_term, limit=100)
+                logger.info(f">>> ANALYSIS FOUND {len(search_results.stories)} stories (total: {search_results.total})")
+                
+                # Note: Full story fetching disabled - requires CDN API token
+                # Content type filtering will be skipped if full stories can't be fetched
+                logger.info(f">>> Skipping full story fetch for analysis (requires CDN API access)")
+                
+                # Filter by content_type if specified AND if stories have content_type populated
+                if content_type and search_results.stories:
+                    # Check if any stories have content_type populated
+                    stories_with_type = [s for s in search_results.stories if s.content_type]
+                    if stories_with_type:
+                        initial_count = len(search_results.stories)
+                        logger.info(f">>> Filtering {initial_count} stories by content_type: {content_type}")
+                        filtered_stories = [
+                            s for s in search_results.stories 
+                            if s.content_type and content_type.lower() in s.content_type.lower()
+                        ]
+                        search_results.stories = filtered_stories
+                        logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                    else:
+                        logger.warning(f">>> Cannot filter by content_type: no stories have content_type populated")
+                        logger.warning(f">>> Returning all {len(search_results.stories)} stories without content_type filtering")
+                
+                # Store results for potential listing later
+                results_for_context = [story.dict() for story in search_results.stories]
+                conversation_contexts[session_key] = results_for_context
+                
+                # Store analysis data
+                analysis_data = {
+                    "description": f"Analyzed {search_term}" + (f" ({content_type})" if content_type else ""),
+                    "count": len(search_results.stories),
+                    "search_term": search_term,
+                    "content_type": content_type,
+                    "analysis_type": analysis_type or "count"
+                }
+                conversation_analyses[session_key] = analysis_data
+                conversation_response.analysis = analysis_data
+                
+                # Provide conversational response with count
+                count = len(search_results.stories)
+                if count > 0:
+                    type_str = f"{content_type}s" if content_type else "stories"
+                    conversation_response.message = f"I found {count} {type_str} that mention {search_term}. Would you like me to list them?"
+                    logger.info(f">>> ANALYSIS COMPLETE: {count} results stored for potential listing")
+                else:
+                    conversation_response.message = f"I couldn't find any {content_type if content_type else 'stories'} that mention {search_term}."
+                    conversation_contexts[session_key] = []
+                    
+            except Exception as e:
+                logger.error(f">>> ANALYSIS ERROR: {str(e)}", exc_info=True)
+                conversation_response.message += "\n\nI encountered an issue analyzing the content. Please try again."
+        
+        elif action == "list_analyzed":
+            # List the previously analyzed results with optional limit
+            logger.info(f">>> LISTING ANALYZED RESULTS for session: {session_key}, limit: {search_limit}")
+            if previous_results and len(previous_results) > 0:
+                from backend.models import StoryResult, SearchResults
+                
+                # Apply limit if specified by user
+                results_to_show = previous_results[:search_limit] if search_limit else previous_results
+                
+                story_results = []
+                for story_dict in results_to_show:
+                    story_results.append(StoryResult(**story_dict))
+                
+                conversation_response.results = SearchResults(
+                    stories=story_results,
+                    total=len(story_results)
+                )
+                logger.info(f">>> LISTED {len(story_results)} of {len(previous_results)} analyzed stories (limit applied: {search_limit})")
+            else:
+                conversation_response.message = "I don't have any analyzed results to show. Please ask me to search or analyze first."
+                logger.warning(f">>> No analyzed results to list for session: {session_key}")
+        
+        elif action == "search" and search_term:
+            logger.info(f">>> PERFORMING SEARCH with term: '{search_term}', limit: {search_limit}, type: '{content_type}'")
             try:
                 search_results = await storyblok_client.search(term=search_term, limit=search_limit)
                 logger.info(f">>> SEARCH RETURNED {len(search_results.stories)} stories (total: {search_results.total})")
                 
-                # Fetch full story details for each result to provide better preview
-                if search_results.stories:
-                    logger.info(f">>> Fetching full details for {len(search_results.stories)} stories")
-                    for story in search_results.stories:
-                        try:
-                            full_story = await storyblok_client.get_story_by_id(story.story_id)
-                            if full_story:
-                                story.full_story = full_story
-                                logger.debug(f"Fetched full story for ID {story.story_id}")
-                        except Exception as e:
-                            logger.warning(f"Could not fetch full story for ID {story.story_id}: {e}")
-                            # Continue without full story data
+                # Note: Full story fetching disabled - requires CDN API token
+                # Stories will be returned with basic info from vsearch API only
+                logger.info(f">>> Returning {len(search_results.stories)} stories with basic info (full story fetch disabled)")
+                
+                # Filter by content_type if specified AND if stories have content_type populated
+                if content_type and search_results.stories:
+                    # Check if any stories have content_type populated
+                    stories_with_type = [s for s in search_results.stories if s.content_type]
+                    if stories_with_type:
+                        initial_count = len(search_results.stories)
+                        logger.info(f">>> Filtering {initial_count} stories by content_type: {content_type}")
+                        filtered_stories = [
+                            s for s in search_results.stories 
+                            if s.content_type and content_type.lower() in s.content_type.lower()
+                        ]
+                        search_results.stories = filtered_stories
+                        search_results.total = len(filtered_stories)
+                        logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                    else:
+                        logger.warning(f">>> Cannot filter by content_type: no stories have content_type populated")
+                        logger.warning(f">>> Returning all {len(search_results.stories)} stories without content_type filtering")
                 
                 conversation_response.results = search_results
                 logger.info(f">>> RESULTS ATTACHED TO RESPONSE: {len(search_results.stories)} stories")
@@ -241,7 +348,7 @@ async def conversation(request: ConversationRequest):
             except Exception as e:
                 logger.error(f">>> STORYBLOK SEARCH ERROR: {str(e)}", exc_info=True)
                 conversation_response.message += "\n\nI encountered an issue searching for content. Please try again."
-        # If action is refine, filter previous results
+        
         elif action == "refine" and filter_term:
             logger.info(f">>> REFINING PREVIOUS RESULTS with filter: '{filter_term}'")
             logger.info(f">>> Current session key: {session_key}")

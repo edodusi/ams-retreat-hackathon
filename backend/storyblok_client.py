@@ -44,7 +44,8 @@ class StoryblokClient:
             cursor=story_data.get("cursor", 0),
             name=story_data.get("name", ""),
             slug=story_data.get("slug", ""),
-            story_id=story_data.get("story_id", 0)
+            story_id=story_data.get("story_id", 0),
+            content_type=None  # Will be set later when full story is fetched
         )
 
         return story
@@ -141,21 +142,26 @@ class StoryblokClient:
             httpx.HTTPError: If the API request fails
         """
         # Use the Content Delivery API to fetch full story
+        # CDN API requires token as query parameter, not header
         url = f"{self.base_url}/v2/cdn/stories/{story_id}"
-        headers = self._build_headers()
+        params = {"token": self.token}
         
         logger.info(f"Fetching full story details for ID: {story_id}")
         
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
-                response = await client.get(url, headers=headers)
+                response = await client.get(url, params=params)
                 response.raise_for_status()
                 
                 data = response.json()
                 story_data = data.get("story") if isinstance(data, dict) else None
                 
                 if story_data:
-                    logger.info(f"Successfully fetched story {story_id}")
+                    # Extract component type from content
+                    component_type = 'unknown'
+                    if story_data.get('content') and isinstance(story_data['content'], dict):
+                        component_type = story_data['content'].get('component', 'unknown')
+                    logger.info(f"Successfully fetched story {story_id}: component={component_type}")
                     return story_data
                 else:
                     logger.warning(f"No story data found for ID {story_id}")

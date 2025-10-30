@@ -28,6 +28,7 @@ class StoryResult(BaseModel):
     name: str = Field(..., description="Story name")
     slug: str = Field(..., description="Story slug/path")
     story_id: int = Field(..., description="Story ID")
+    content_type: Optional[str] = Field(None, description="Content type/component of the story")
     
     # Additional fields for full story details (when fetched)
     full_story: Optional[dict] = Field(None, description="Full story data from Storyblok API")
@@ -44,6 +45,8 @@ class ConversationResponse(BaseModel):
     message: str = Field(..., description="Assistant's response message")
     results: Optional[SearchResults] = Field(None, description="Search results if applicable")
     conversation_id: Optional[str] = Field(None, description="Conversation session ID")
+    action: Optional[str] = Field(None, description="Action type performed (search, analyze, refine, chat, clarify)")
+    analysis: Optional[dict] = Field(None, description="Analysis data (e.g., counts, statistics)")
 
 
 class HealthCheck(BaseModel):

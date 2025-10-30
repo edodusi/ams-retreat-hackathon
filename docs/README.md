@@ -11,6 +11,8 @@ Welcome to the Storyblok Voice Assistant documentation! This guide will help you
 ### Reference Documentation
 - **[API Documentation](API.md)** - Complete API reference with examples
 - **[Features Guide](FEATURES.md)** - Detailed feature documentation and usage
+- **[Analytical Features](analytical-features.md)** - Content type filtering, analysis, and conversational intelligence
+- **[User Guide](user-guide.md)** - User-friendly guide with examples and patterns
 - **[cURL Tests](CURL_TESTS.md)** - Backend testing with cURL commands
 
 ### Specifications
@@ -61,6 +63,36 @@ Detailed documentation of all features:
 - Technical implementation details
 
 **Use this when:** You want to understand what the system can do and how to use it.
+
+---
+
+### [Analytical Features Guide](analytical-features.md)
+Comprehensive documentation of analytical capabilities:
+- Content type awareness and filtering
+- Analytical queries (count, analyze)
+- Conversational analysis flow
+- Clarification requests
+- Action types (analyze, list_analyzed, clarify)
+- Session management
+- API response structures
+- Testing examples
+
+**Use this when:** You want to understand the analytical and conversational intelligence features.
+
+---
+
+### [User Guide](user-guide.md)
+User-friendly guide with practical examples:
+- Quick start examples
+- Conversational patterns
+- Content type understanding
+- Tips and tricks
+- Common workflows
+- Troubleshooting
+- Accessibility features
+- Best practices
+
+**Use this when:** You're a content manager or editor learning to use the assistant.
 
 ---
 
@@ -125,9 +157,10 @@ Machine-readable API specification:
 3. Test with [cURL Tests](CURL_TESTS.md)
 
 #### Understand how to use the application
-1. Read [Features Guide](FEATURES.md)
-2. Review conversation examples in [API Documentation](API.md)
-3. Try the live application
+1. Read [User Guide](user-guide.md) for practical examples
+2. Read [Features Guide](FEATURES.md) for technical details
+3. Review [Analytical Features](analytical-features.md) for advanced capabilities
+4. Try the live application
 
 #### Integrate with the API
 1. Read [API Documentation](API.md)
@@ -137,8 +170,10 @@ Machine-readable API specification:
 
 #### Test the backend
 1. Start with [cURL Tests](CURL_TESTS.md)
-2. Use debug endpoints (see [API Documentation](API.md))
-3. Check [Setup Guide](SETUP.md) for troubleshooting
+2. Test analytical features with `test_analytical_features.sh`
+3. Run unit tests: `pytest tests/test_analytical_features.py`
+4. Use debug endpoints (see [API Documentation](API.md))
+5. Check [Setup Guide](SETUP.md) for troubleshooting
 
 #### Understand the architecture
 1. Read [Technical Specifications](../SPECS.md)
@@ -168,6 +203,7 @@ All documentation follows these conventions:
 - API examples include full requests and responses
 - Language-specific examples labeled (JavaScript, Python, cURL)
 - Expected outputs shown after commands
+- Conversational examples show multi-turn interactions
 
 ### Accessibility
 - Clear, concise language
@@ -189,6 +225,8 @@ When making changes to the project:
 
 2. **New features** → Update:
    - [Features Guide](FEATURES.md)
+   - [Analytical Features](analytical-features.md) if analytical features
+   - [User Guide](user-guide.md) with practical examples
    - [Project README](../README.md)
    - [API Documentation](API.md) if API changes
 
@@ -218,9 +256,11 @@ If you find errors or gaps in documentation:
 4. Enable DEBUG mode for verbose logging
 
 ### Feature Questions
-1. Check [Features Guide](FEATURES.md)
-2. Review [Technical Specifications](../SPECS.md)
-3. Try the interactive API docs at `/docs`
+1. Check [User Guide](user-guide.md) for practical usage
+2. Check [Analytical Features](analytical-features.md) for advanced features
+3. Check [Features Guide](FEATURES.md) for technical details
+4. Review [Technical Specifications](../SPECS.md)
+5. Try the interactive API docs at `/docs`
 
 ---
 
@@ -248,16 +288,18 @@ When the server is running:
 | Setup Guide | ✅ Complete | Oct 30, 2025 |
 | API Documentation | ✅ Complete | Oct 30, 2025 |
 | Features Guide | ✅ Complete | Oct 30, 2025 |
+| Analytical Features | ✅ Complete | Jan 2025 |
+| User Guide | ✅ Complete | Jan 2025 |
 | cURL Tests | ✅ Complete | Oct 30, 2025 |
 | Technical Specs | ✅ Complete | Oct 30, 2025 |
-| OpenAPI Spec | ✅ Complete | Oct 30, 2025 |
+| OpenAPI Spec | ✅ Complete | Jan 2025 |
 | Development Guidelines | ✅ Complete | Oct 30, 2025 |
 
 ---
 
-**Project Version:** 1.0.0  
-**Documentation Version:** 1.0.0  
-**Last Updated:** October 30, 2025
+**Project Version:** 1.2.0  
+**Documentation Version:** 1.2.0  
+**Last Updated:** January 2025
 
 ---
 

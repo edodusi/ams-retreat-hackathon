@@ -6,6 +6,41 @@ All notable changes to the Storyblok Voice Assistant project will be documented 
 
 ### Added - 2025-01-XX
 
+#### Analytical and Conversational Intelligence Features
+- **Content type awareness**: System now detects and filters by Storyblok content types (article, blog_post, page, etc.)
+- **Analytical queries**: Count and analyze content before listing (e.g., "how many articles mention drupal?")
+- **Conversational analysis flow**: AI presents counts/statistics first, then asks if user wants to see the list
+- **Clarification requests**: System asks for content type when ambiguous (e.g., "What type of content? Articles, blog posts, or pages?")
+- **Smart content type filtering**: Client-side filtering ensures only requested content types are returned
+- **Content type badges**: Visual indicators on story cards showing content type
+
+**Action Types:**
+- `analyze` - Count/analyze content without immediately listing results
+- `list_analyzed` - List previously analyzed results after user confirmation
+- `clarify` - Ask user for clarification when query is ambiguous
+- Enhanced `search` - Now supports content_type parameter
+- Enhanced `refine` - Works with content type aware results
+
+**Examples:**
+- "How many articles mention Drupal?" → Shows count, asks to list
+- "Find 5 articles about React" → Filters to article content type only
+- "Show me blog posts about AI" → Returns only blog_post type
+- "Find stories about marketing" → Asks for content type clarification
+
+**Modified Files:**
+- `backend/models.py`: Added `content_type` to StoryResult, `action` and `analysis` to ConversationResponse
+- `backend/bedrock_client.py`: Enhanced system prompt with analytical, clarification, and content type actions
+- `backend/storyblok_client.py`: Added content_type parameter and filtering logic
+- `backend/main.py`: Added `conversation_analyses` storage and action routing for analyze/clarify/list_analyzed
+- `frontend/index.html`: Added analysis display component and content type badges
+- `docs/analytical-features.md`: Comprehensive feature documentation
+- `docs/openapi.yaml`: Updated API spec with new fields and examples
+- `test_analytical_features.sh`: Complete test suite for new features
+
+**Commit:** Analytical and conversational intelligence with content type awareness
+
+---
+
 #### Context-Aware Refinement Feature
 - **Session-based context management**: System remembers previous search results across conversation turns
 - **Intelligent action detection**: AI distinguishes between new searches and refinement requests
