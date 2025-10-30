@@ -205,6 +205,19 @@ async def conversation(request: ConversationRequest):
         logger.info(f">>> FINAL RESPONSE: message length={len(conversation_response.message)}, has_results={conversation_response.results is not None}")
         if conversation_response.results:
             logger.info(f">>> RETURNING {len(conversation_response.results.stories)} stories in response")
+            logger.info(f">>> Results object type: {type(conversation_response.results)}")
+            logger.info(f">>> Results.stories type: {type(conversation_response.results.stories)}")
+            if conversation_response.results.stories:
+                logger.info(f">>> First story sample: {conversation_response.results.stories[0].dict()}")
+        
+        # Serialize to dict to verify JSON structure
+        response_dict = conversation_response.dict()
+        logger.info(f">>> Serialized response keys: {response_dict.keys()}")
+        if response_dict.get('results'):
+            logger.info(f">>> Serialized results keys: {response_dict['results'].keys()}")
+            logger.info(f">>> Serialized stories count: {len(response_dict['results'].get('stories', []))}")
+            if response_dict['results'].get('stories'):
+                logger.info(f">>> First serialized story keys: {response_dict['results']['stories'][0].keys()}")
         
         return conversation_response
         

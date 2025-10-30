@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpine.js Story Display Test</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .story-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            margin: 12px 0;
+            border-radius: 6px;
+        }
+        .story-card h3 {
+            margin: 0 0 8px 0;
+            color: #111827;
+        }
+        .story-card p {
+            margin: 4px 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .debug-info {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .success {
+            color: #059669;
+        }
+        .error {
+            color: #dc2626;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Alpine.js Story Display Test</h1>
+    <p>This test verifies that story results display correctly with the fixed template.</p>
+
+    <div x-data="testApp()">
+        <!-- Test Controls -->
+        <div class="test-section">
+            <h2>Test Controls</h2>
+            <button @click="loadTestData()">Load Test Data (2 stories)</button>
+            <button @click="loadEmptyData()">Load Empty Results</button>
+            <button @click="loadNoResults()">Load No Results (null)</button>
+            <button @click="clearMessages()">Clear All</button>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="test-section">
+            <h2>Debug Info</h2>
+            <div class="debug-info">
+                <div><strong>Messages count:</strong> <span x-text="messages.length"></span></div>
+                <div><strong>Last message has results:</strong> 
+                    <span :class="messages.length > 0 && messages[messages.length - 1].results ? 'success' : 'error'" 
+                          x-text="messages.length > 0 ? (!!messages[messages.length - 1].results) : 'N/A'">
+                    </span>
+                </div>
+                <div><strong>Last message stories count:</strong> 
+                    <span x-text="messages.length > 0 && messages[messages.length - 1].results ? messages[messages.length - 1].results.stories.length : 'N/A'">
+                    </span>
+                </div>
+                <div><strong>Stories is array:</strong> 
+                    <span x-text="messages.length > 0 && messages[messages.length - 1].results ? Array.isArray(messages[messages.length - 1].results.stories) : 'N/A'">
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Display (Using Actual Template Logic) -->
+        <div class="test-section">
+            <h2>Messages Display</h2>
+            
+            <div x-show="messages.length === 0" style="color: #6b7280; font-style: italic;">
+                No messages yet. Click "Load Test Data" to simulate a search response.
+            </div>
+
+            <template x-for="(message, index) in messages" :key="index">
+                <div style="margin: 20px 0;">
+                    <!-- Message Content -->
+                    <div style="background: #e0f2fe; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+                        <strong>Assistant:</strong> <span x-text="message.content"></span>
+                    </div>
+                    
+                    <!-- Debug indicator -->
+                    <div x-show="message.role === 'assistant' && message.results" 
+                         style="font-size: 11px; color: #6b7280; margin: 4px 0;">
+                        <span x-text="'[Debug: Results object exists, stories count: ' + (message.results?.stories?.length || 0) + ']'"></span>
+                    </div>
+                    
+                    <!-- Story results (using fixed template) -->
+                    <template x-if="message.role === 'assistant' && message.results && Array.isArray(message.results.stories) && message.results.stories.length > 0">
+                        <div style="margin-top: 12px;">
+                            <h3 style="font-size: 14px; color: #374151; margin-bottom: 8px;">
+                                📚 Found <span x-text="message.results.stories.length"></span> 
+                                <span x-text="message.results.stories.length === 1 ? 'story' : 'stories'"></span>
+                            </h3>
+                            
+                            <template x-for="(story, storyIndex) in message.results.stories" :key="storyIndex">
+                                <div class="story-card">
+                                    <h3 x-text="story.name"></h3>
+                                    <p x-show="story.body" 
+                                       x-text="story.body && story.body.length > 100 ? story.body.substring(0, 100) + '...' : story.body">
+                                    </p>
+                                    <p style="color: #9ca3af; font-size: 12px;">
+                                        <strong>Slug:</strong> <span x-text="'/' + story.slug"></span> | 
+                                        <strong>ID:</strong> <span x-text="story.story_id"></span>
+                                    </p>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    
+                    <!-- No results message -->
+                    <div x-show="message.role === 'assistant' && message.results && (!message.results.stories || message.results.stories.length === 0)"
+                         style="padding: 12px; background: #fef3c7; border-radius: 6px; margin-top: 8px;">
+                        No stories found in results.
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Raw Data View -->
+        <div class="test-section">
+            <h2>Raw Data (JSON)</h2>
+            <pre style="background: #1f2937; color: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px;"
+                 x-text="JSON.stringify(messages, null, 2)"></pre>
+        </div>
+    </div>
+
+    <script>
+        function testApp() {
+            return {
+                messages: [],
+                
+                init() {
+                    console.log('Test app initialized');
+                },
+                
+                loadTestData() {
+                    // Simulate API response with stories
+                    const response = {
+                        message: 'I found 2 stories about marketing.',
+                        results: {
+                            stories: [
+                                {
+                                    body: 'This is a comprehensive guide to modern marketing strategies that will help you reach your target audience effectively.',
+                                    cursor: 1,
+                                    name: 'Marketing Strategy 2025',
+                                    slug: 'marketing-strategy-2025',
+                                    story_id: 12345,
+                                    full_story: null
+                                },
+                                {
+                                    body: 'Learn how to leverage social media platforms to grow your brand and engage with customers in meaningful ways.',
+                                    cursor: 2,
+                                    name: 'Social Media Best Practices',
+                                    slug: 'social-media-best-practices',
+                                    story_id: 12346,
+                                    full_story: null
+                                }
+                            ],
+                            total: 2
+                        }
+                    };
+                    
+                    this.addMessage(response);
+                    console.log('✓ Loaded test data with 2 stories');
+                },
+                
+                loadEmptyData() {
+                    // Simulate API response with no stories
+                    const response = {
+                        message: 'I searched but found no matching stories.',
+                        results: {
+                            stories: [],
+                            total: 0
+                        }
+                    };
+                    
+                    this.addMessage(response);
+                    console.log('✓ Loaded empty results');
+                },
+                
+                loadNoResults() {
+                    // Simulate API response with null results (chat only)
+                    const response = {
+                        message: 'Hello! How can I help you find content today?',
+                        results: null
+                    };
+                    
+                    this.addMessage(response);
+                    console.log('✓ Loaded message with no results');
+                },
+                
+                addMessage(data) {
+                    const assistantMessage = {
+                        role: 'assistant',
+                        content: data.message,
+                        results: data.results ? {
+                            stories: Array.isArray(data.results.stories) ? data.results.stories : [],
+                            total: data.results.total || 0
+                        } : null
+                    };
+                    
+                    console.log('Adding message:', assistantMessage);
+                    console.log('Has results:', !!assistantMessage.results);
+                    console.log('Stories count:', assistantMessage.results?.stories?.length);
+                    
+                    this.messages.push(assistantMessage);
+                    
+                    console.log('Messages array now has', this.messages.length, 'messages');
+                },
+                
+                clearMessages() {
+                    this.messages = [];
+                    console.log('✓ Cleared all messages');
+                }
+            };
+        }
+    </script>
+</body>
+</html>

@@ -188,29 +188,34 @@
                                 <p class="text-base leading-relaxed" x-text="message.content"></p>
                             </div>
                             
+                            <!-- Debug indicator for results (REMOVE IN PRODUCTION) -->
+                            <div x-show="message.role === 'assistant' && message.results" class="mt-2 text-xs text-gray-500">
+                                <span x-text="'[Debug: Results object exists, stories count: ' + (message.results?.stories?.length || 0) + ']'"></span>
+                            </div>
+                            
                             <!-- Story results (only for assistant messages) -->
-                            <div 
-                                x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
-                                class="space-y-3 mt-4"
-                                role="region"
-                                aria-label="Search results"
-                            >
-                                <template x-for="story in message.results.stories" :key="story.story_id">
-                                    <div 
-                                        class="story-card rounded-lg p-5"
-                                        tabindex="0"
-                                        role="article"
-                                        :aria-label="'Story: ' + story.name"
-                                    >
+                            <template x-if="message.role === 'assistant' && message.results && Array.isArray(message.results.stories) && message.results.stories.length > 0">
+                                <div 
+                                    class="space-y-3 mt-4"
+                                    role="region"
+                                    aria-label="Search results"
+                                >
+                                    <template x-for="(story, storyIndex) in message.results.stories" :key="storyIndex">
+                                        <div 
+                                            class="story-card rounded-lg p-5"
+                                            tabindex="0"
+                                            role="article"
+                                            :aria-label="'Story: ' + story.name"
+                                        >
                                         <!-- Story Title -->
                                         <h3 class="text-lg font-semibold text-gray-900 mb-2" x-text="story.name"></h3>
                                         
                                         <!-- Story Body Preview -->
-                                        <p 
-                                            class="text-gray-600 mb-3 line-clamp-3"
-                                            x-show="story.body"
-                                            x-text="story.body.length > 200 ? story.body.substring(0, 200) + '...' : story.body"
-                                        ></p>
+                                            <p 
+                                                class="text-gray-600 mb-3 line-clamp-3"
+                                                x-show="story.body"
+                                                x-text="story.body && story.body.length > 200 ? story.body.substring(0, 200) + '...' : story.body"
+                                            ></p>
                                         
                                         <!-- Full Story Preview (if available) -->
                                         <template x-if="story.full_story">
@@ -239,9 +244,10 @@
                                                 ID: <span x-text="story.story_id"></span>
                                             </span>
                                         </div>
-                                    </div>
-                                </template>
-                            </div>
+                                       </div>
+                                   </template>
+                               </div>
+                           </template>
                         </div>
                     </div>
                 </template>
@@ -506,12 +512,31 @@
                             }
                         }
                         
-                        // Add assistant response
-                        this.messages.push({
+                        // Add assistant response - ensure results structure is preserved
+                        const assistantMessage = {
                             role: 'assistant',
                             content: data.message,
-                            results: data.results
-                        });
+                            results: data.results ? {
+                                stories: Array.isArray(data.results.stories) ? data.results.stories : [],
+                                total: data.results.total || 0
+                            } : null
+                        };
+                        
+                        console.log('[DEBUG] Pushing message to array:', assistantMessage);
+                        console.log('[DEBUG] Has results in message?', !!assistantMessage.results);
+                        console.log('[DEBUG] Has stories in results?', !!assistantMessage.results?.stories);
+                        console.log('[DEBUG] Stories is array?', Array.isArray(assistantMessage.results?.stories));
+                        console.log('[DEBUG] Stories length:', assistantMessage.results?.stories?.length);
+                        if (assistantMessage.results?.stories?.length > 0) {
+                            console.log('[DEBUG] First story structure:', assistantMessage.results.stories[0]);
+                        }
+                        
+                        this.messages.push(assistantMessage);
+                        
+                        console.log('[DEBUG] Messages array length:', this.messages.length);
+                        console.log('[DEBUG] Last message:', this.messages[this.messages.length - 1]);
+                        console.log('[DEBUG] Last message has results?', !!this.messages[this.messages.length - 1].results);
+                        console.log('[DEBUG] Last message stories count:', this.messages[this.messages.length - 1].results?.stories?.length);
                         
                         // Speak the response if TTS is available
                         if (this.synthesis && data.message) {
