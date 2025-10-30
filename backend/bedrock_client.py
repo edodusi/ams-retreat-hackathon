@@ -82,6 +82,7 @@ class BedrockClient:
 Your role:
 - Help users search for content using natural language
 - Interpret their search queries and convert them to search terms
+- Extract the number of results the user wants (if specified)
 - Present search results in a clear, conversational way
 - Help users refine their searches through follow-up questions
 - Be concise but friendly and helpful
@@ -90,20 +91,28 @@ IMPORTANT: You MUST respond ONLY with valid JSON. No extra text before or after 
 
 When a user asks to search for content (e.g., "find marketing stories", "show blog posts"):
 1. Extract the key search terms from their query
-2. Return ONLY this JSON format:
-   {"action": "search", "term": "the search term", "response": "I found some results for you."}
+2. Extract the number of results if specified (e.g., "first 5", "3 articles", "show me 10")
+3. Return ONLY this JSON format:
+   {"action": "search", "term": "the search term", "limit": 10, "response": "I found some results for you."}
 
-Example for "find all marketing stories":
-{"action": "search", "term": "marketing", "response": "Here are the marketing stories I found:"}
+Examples:
+- "find all marketing stories" → {"action": "search", "term": "marketing", "limit": 10, "response": "Here are the marketing stories I found:"}
+- "find the first 5 articles about marketing" → {"action": "search", "term": "marketing articles", "limit": 5, "response": "Here are 5 marketing articles:"}
+- "show me 3 blog posts about technology" → {"action": "search", "term": "blog posts technology", "limit": 3, "response": "Here are 3 blog posts about technology:"}
+- "get 20 stories" → {"action": "search", "term": "stories", "limit": 20, "response": "Here are 20 stories:"}
 
 When refining searches (e.g., "only from this year", "show recent ones"):
-3. Consider the conversation context and modify the search accordingly
-4. Return the same JSON format with updated search terms
+4. Consider the conversation context and modify the search accordingly
+5. Return the same JSON format with updated search terms and limit
 
 When just chatting or acknowledging results:
-5. Return: {"action": "chat", "response": "your response"}
+6. Return: {"action": "chat", "response": "your response"}
 
-CRITICAL: Always use the "search" action when the user wants to find, search, or look for content. The response field should be brief - the actual results will be shown automatically.
+IMPORTANT RULES:
+- limit field is REQUIRED for search actions (default to 10 if user doesn't specify)
+- Common phrases indicating limit: "first X", "X items", "show me X", "get X", "top X", "X results"
+- Always use the "search" action when the user wants to find, search, or look for content
+- The response field should be brief - the actual results will be shown automatically
 
 Always be helpful and accessible. Remember that some users may have disabilities and rely on voice interaction."""
 
@@ -169,11 +178,12 @@ Always be helpful and accessible. Remember that some users may have disabilities
                         json_str = response_text[start_idx:end_idx]
                         parsed_response = json.loads(json_str)
                         
-                        logger.info(f"Parsed action: {parsed_response.get('action')}, term: {parsed_response.get('term')}")
+                        logger.info(f"Parsed action: {parsed_response.get('action')}, term: {parsed_response.get('term')}, limit: {parsed_response.get('limit')}")
 
                         return {
                             "action": parsed_response.get("action", "chat"),
                             "term": parsed_response.get("term"),
+                            "limit": parsed_response.get("limit", 10),
                             "response": parsed_response.get("response", response_text),
                             "raw_response": response_text
                         }
@@ -186,6 +196,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
                 return {
                     "action": "chat",
                     "term": None,
+                    "limit": 10,
                     "response": response_text,
                     "raw_response": response_text
                 }
@@ -193,6 +204,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
                 logger.error("No content in Bedrock response")
                 return {
                     "action": "error",
+                    "limit": 10,
                     "response": "I apologize, but I couldn't generate a response. Please try again."
                 }
 

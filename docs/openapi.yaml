@@ -7,6 +7,7 @@ info:
     ## Features
     - Natural language conversation with Claude AI
     - Semantic content search via Storyblok Strata
+    - Dynamic result limits based on user intent (e.g., "first 5 articles")
     - Multi-turn conversation support
     - Accessible voice and text interfaces
     
@@ -79,6 +80,15 @@ paths:
         
         The endpoint maintains conversation context through the conversation_history parameter,
         enabling multi-turn conversations and iterative search refinement.
+        
+        ## Dynamic Result Limits
+        The AI automatically extracts the desired number of results from user queries:
+        - "Find the first 5 articles" → Returns 5 results
+        - "Show me 3 posts" → Returns 3 results
+        - "Get 20 stories" → Returns 20 results
+        - "Find marketing articles" → Returns 10 results (default)
+        
+        Supported patterns: "first X", "show me X", "get X", "top X", "X results"
       operationId: conversation
       requestBody:
         required: true
@@ -91,6 +101,16 @@ paths:
                 summary: Simple search query
                 value:
                   message: "Find articles about marketing"
+                  conversation_history: []
+              searchWithLimit:
+                summary: Search with specific result limit
+                value:
+                  message: "Find the first 5 articles about marketing"
+                  conversation_history: []
+              searchShowMe:
+                summary: Search using 'show me' pattern
+                value:
+                  message: "Show me 3 blog posts about technology"
                   conversation_history: []
               withHistory:
                 summary: Refined search with history
@@ -115,7 +135,7 @@ paths:
                 $ref: '#/components/schemas/ConversationResponse'
               examples:
                 withResults:
-                  summary: Response with search results
+                  summary: Response with search results (default limit)
                   value:
                     message: "I found 15 marketing articles. Here are the top results:"
                     results:
@@ -141,6 +161,44 @@ paths:
                             content: {}
                             published_at: "2025-01-20T10:00:00Z"
                       total: 15
+                    conversation_id: null
+                withLimitedResults:
+                  summary: Response with user-specified limit (5 results)
+                  value:
+                    message: "Here are 5 marketing articles:"
+                    results:
+                      stories:
+                        - body: "A comprehensive guide to modern marketing tactics..."
+                          cursor: 0
+                          name: "Marketing Strategy 2025"
+                          slug: "blog/marketing-strategy-2025"
+                          story_id: 12345
+                          full_story: null
+                        - body: "Learn how to maximize your social media presence..."
+                          cursor: 1
+                          name: "Social Media Best Practices"
+                          slug: "blog/social-media-best-practices"
+                          story_id: 12346
+                          full_story: null
+                        - body: "Essential tips for creating engaging content..."
+                          cursor: 2
+                          name: "Content Marketing Fundamentals"
+                          slug: "blog/content-marketing"
+                          story_id: 12347
+                          full_story: null
+                        - body: "Exploring the future of AI-powered marketing..."
+                          cursor: 3
+                          name: "AI in Marketing"
+                          slug: "blog/ai-marketing"
+                          story_id: 12348
+                          full_story: null
+                        - body: "How to measure your marketing ROI effectively..."
+                          cursor: 4
+                          name: "Marketing Analytics Guide"
+                          slug: "blog/marketing-analytics"
+                          story_id: 12349
+                          full_story: null
+                      total: 5
                     conversation_id: null
                 chatOnly:
                   summary: Response without search

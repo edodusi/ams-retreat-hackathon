@@ -154,8 +154,9 @@ async def conversation(request: ConversationRequest):
         action = claude_response.get("action", "chat")
         response_text = claude_response.get("response", "")
         search_term = claude_response.get("term")
+        search_limit = claude_response.get("limit", 10)  # Default to 10 if not specified
         
-        logger.info(f"Claude response - Action: {action}, Term: {search_term}, Message length: {len(response_text)}")
+        logger.info(f"Claude response - Action: {action}, Term: {search_term}, Limit: {search_limit}, Message length: {len(response_text)}")
         
         # Initialize response
         conversation_response = ConversationResponse(
@@ -165,9 +166,9 @@ async def conversation(request: ConversationRequest):
         
         # If action is search, query Storyblok (async httpx call)
         if action == "search" and search_term:
-            logger.info(f">>> PERFORMING SEARCH with term: '{search_term}'")
+            logger.info(f">>> PERFORMING SEARCH with term: '{search_term}', limit: {search_limit}")
             try:
-                search_results = await storyblok_client.search(term=search_term)
+                search_results = await storyblok_client.search(term=search_term, limit=search_limit)
                 logger.info(f">>> SEARCH RETURNED {len(search_results.stories)} stories (total: {search_results.total})")
                 
                 # Fetch full story details for each result to provide better preview
