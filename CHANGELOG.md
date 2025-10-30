@@ -6,6 +6,29 @@ All notable changes to the Storyblok Voice Assistant project will be documented 
 
 ### Added - 2025-01-XX
 
+#### Context-Aware Refinement Feature
+- **Session-based context management**: System remembers previous search results across conversation turns
+- **Intelligent action detection**: AI distinguishes between new searches and refinement requests
+- **Natural refinement queries**: Supports patterns like "out of those", "from these", "which mention X"
+- **Progressive filtering**: Users can refine results multiple times in sequence
+- **In-memory session storage**: Context stored per conversation for immediate access (Redis recommended for production)
+- **Automatic context updates**: Filtered results become new context for further refinement
+
+**Examples:**
+- "Find 10 marketing stories" → Returns 10 stories
+- "Out of those, give me the one which mentions omnichannel" → Filters and returns matching story
+- "From these, show only about social media" → Further filters the results
+
+**Modified Files:**
+- `backend/bedrock_client.py`: Added "refine" action type and context injection
+- `backend/main.py`: Session management, filter logic, and action routing
+- `docs/context-aware-refinement.md`: Complete feature documentation
+- `docs/test-context-aware.md`: Testing guide with examples
+
+**Commit:** Context-aware conversation with result refinement
+
+---
+
 #### Dynamic Result Limit Feature
 - **AI-powered limit extraction**: Claude now intelligently extracts the desired number of results from user queries
 - **Natural language patterns**: Supports "first 5", "show me 3", "get 20", "top 7", and similar patterns
@@ -144,4 +167,4 @@ Hackathon Project
 ---
 
 **Last Updated:** 2025-01-XX
-**Version:** 1.0.0+unreleased
+**Version:** 1.1.0+unreleased (with context-aware features)

@@ -83,43 +83,71 @@ Your role:
 - Help users search for content using natural language
 - Interpret their search queries and convert them to search terms
 - Extract the number of results the user wants (if specified)
+- Filter and refine previous search results based on follow-up questions
 - Present search results in a clear, conversational way
 - Help users refine their searches through follow-up questions
 - Be concise but friendly and helpful
 
 IMPORTANT: You MUST respond ONLY with valid JSON. No extra text before or after the JSON.
 
-When a user asks to search for content (e.g., "find marketing stories", "show blog posts"):
-1. Extract the key search terms from their query
-2. Extract the number of results if specified (e.g., "first 5", "3 articles", "show me 10")
-3. Return ONLY this JSON format:
-   {"action": "search", "term": "the search term", "limit": 10, "response": "I found some results for you."}
+## Action Types
+
+### 1. NEW SEARCH (action: "search")
+When a user asks to search for NEW content (e.g., "find marketing stories", "show blog posts"):
+- Extract the key search terms from their query
+- Extract the number of results if specified
+- Return: {"action": "search", "term": "search term", "limit": 10, "response": "message"}
 
 Examples:
 - "find all marketing stories" → {"action": "search", "term": "marketing", "limit": 10, "response": "Here are the marketing stories I found:"}
 - "find the first 5 articles about marketing" → {"action": "search", "term": "marketing articles", "limit": 5, "response": "Here are 5 marketing articles:"}
-- "show me 3 blog posts about technology" → {"action": "search", "term": "blog posts technology", "limit": 3, "response": "Here are 3 blog posts about technology:"}
-- "get 20 stories" → {"action": "search", "term": "stories", "limit": 20, "response": "Here are 20 stories:"}
 
-When refining searches (e.g., "only from this year", "show recent ones"):
-4. Consider the conversation context and modify the search accordingly
-5. Return the same JSON format with updated search terms and limit
+### 2. REFINE/FILTER PREVIOUS RESULTS (action: "refine")
+When a user wants to FILTER or NARROW DOWN results from the previous search (e.g., "out of those", "from these", "which one"):
+- Extract the filter criteria (keywords, topics, attributes)
+- Return: {"action": "refine", "filter_term": "criteria", "response": "message"}
 
-When just chatting or acknowledging results:
-6. Return: {"action": "chat", "response": "your response"}
+Examples:
+- Previous: [10 marketing stories shown]
+  User: "out of those stories, give me the one which mentions omnichannel"
+  → {"action": "refine", "filter_term": "omnichannel", "response": "Here's the story that mentions omnichannel:"}
 
-IMPORTANT RULES:
-- limit field is REQUIRED for search actions (default to 10 if user doesn't specify)
-- Common phrases indicating limit: "first X", "X items", "show me X", "get X", "top X", "X results"
-- Always use the "search" action when the user wants to find, search, or look for content
-- The response field should be brief - the actual results will be shown automatically
+- Previous: [8 blog posts shown]
+  User: "from these, show me only the ones about AI"
+  → {"action": "refine", "filter_term": "AI", "response": "Here are the posts about AI:"}
+
+- Previous: [15 stories shown]
+  User: "which ones are published this year?"
+  → {"action": "refine", "filter_term": "published this year", "response": "Here are the stories from this year:"}
+
+### 3. CHAT (action: "chat")
+When just chatting or acknowledging: {"action": "chat", "response": "your response"}
+
+## How to Distinguish "search" vs "refine"
+
+Use "refine" when:
+- User references previous results: "out of those", "from these", "which one", "among them"
+- User wants to filter/narrow: "only the ones", "just show", "filter by"
+- Context indicates they're working with existing results
+
+Use "search" when:
+- User asks for new/different content
+- No reference to previous results
+- Completely new topic or search term
+
+## Important Rules
+- limit field is REQUIRED for "search" actions (default to 10)
+- filter_term field is REQUIRED for "refine" actions
+- The response field should be brief - results will be shown automatically
+- Always check conversation history to understand context
 
 Always be helpful and accessible. Remember that some users may have disabilities and rely on voice interaction."""
 
     def converse(
         self,
         message: str,
-        conversation_history: List[Message]
+        conversation_history: List[Message],
+        previous_results: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Send a message to Claude and get a response.
@@ -127,6 +155,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
         Args:
             message: The user's message
             conversation_history: Previous conversation messages
+            previous_results: Optional list of previous search results for context
 
         Returns:
             Dict containing the response and any extracted actions
@@ -134,7 +163,18 @@ Always be helpful and accessible. Remember that some users may have disabilities
         Raises:
             Exception: If the API request fails
         """
-        messages = self._format_messages(conversation_history, message)
+        # Add context about previous results if available
+        context_message = message
+        if previous_results:
+            # Add results context to help Claude understand what to refine
+            results_summary = f"\n\n[CONTEXT: Previous search returned {len(previous_results)} stories. "
+            results_summary += "Story titles: " + ", ".join([r.get('name', 'Unknown') for r in previous_results[:10]])
+            if len(previous_results) > 10:
+                results_summary += f" and {len(previous_results) - 10} more"
+            results_summary += "]"
+            context_message = message + results_summary
+        
+        messages = self._format_messages(conversation_history, context_message)
 
         request_body = {
             "messages": messages,
@@ -178,11 +218,13 @@ Always be helpful and accessible. Remember that some users may have disabilities
                         json_str = response_text[start_idx:end_idx]
                         parsed_response = json.loads(json_str)
                         
-                        logger.info(f"Parsed action: {parsed_response.get('action')}, term: {parsed_response.get('term')}, limit: {parsed_response.get('limit')}")
+                        action = parsed_response.get("action", "chat")
+                        logger.info(f"Parsed action: {action}, term: {parsed_response.get('term')}, filter_term: {parsed_response.get('filter_term')}, limit: {parsed_response.get('limit')}")
 
                         return {
-                            "action": parsed_response.get("action", "chat"),
+                            "action": action,
                             "term": parsed_response.get("term"),
+                            "filter_term": parsed_response.get("filter_term"),
                             "limit": parsed_response.get("limit", 10),
                             "response": parsed_response.get("response", response_text),
                             "raw_response": response_text
@@ -196,6 +238,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
                 return {
                     "action": "chat",
                     "term": None,
+                    "filter_term": None,
                     "limit": 10,
                     "response": response_text,
                     "raw_response": response_text
@@ -204,6 +247,8 @@ Always be helpful and accessible. Remember that some users may have disabilities
                 logger.error("No content in Bedrock response")
                 return {
                     "action": "error",
+                    "term": None,
+                    "filter_term": None,
                     "limit": 10,
                     "response": "I apologize, but I couldn't generate a response. Please try again."
                 }

@@ -1,0 +1,153 @@
+# Context-Aware Conversation Flow
+
+## Your Example: Visual Flow
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TURN 1: Initial Search                                          │
+└─────────────────────────────────────────────────────────────────┘
+
+User Input: "find 10 marketing stories"
+    │
+    ▼
+┌──────────────────────────┐
+│ Claude AI                │
+│ Analyzes: NEW search     │
+│ Action: "search"         │
+│ Term: "marketing"        │
+│ Limit: 10                │
+└───────────┬──────────────┘
+            │
+            ▼
+┌──────────────────────────┐
+│ Storyblok API            │
+│ GET /vsearches           │
+│ ?term=marketing&limit=10 │
+└───────────┬──────────────┘
+            │
+            ▼
+    Returns 10 stories
+            │
+            ▼
+┌──────────────────────────────────────────┐
+│ Session Context Storage                  │
+│ session_key: abc123                      │
+│ results: [Story1, Story2, ... Story10]   │
+└──────────────────────────────────────────┘
+            │
+            ▼
+    Display 10 story cards to user
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TURN 2: Refinement                                              │
+└─────────────────────────────────────────────────────────────────┘
+
+User Input: "out of those stories, give me the one which mentions omnichannel"
+    │
+    ▼
+┌──────────────────────────────────────────┐
+│ Backend                                  │
+│ 1. Retrieves previous results           │
+│    from session: abc123                  │
+│ 2. Found: 10 stories                     │
+└───────────┬──────────────────────────────┘
+            │
+            ▼
+┌──────────────────────────────────────────┐
+│ Claude AI                                │
+│ Analyzes with context:                   │
+│ - User message                           │
+│ - Conversation history                   │
+│ - Previous 10 story titles               │
+│                                          │
+│ Detects: REFINEMENT request             │
+│ Action: "refine"                         │
+│ Filter: "omnichannel"                    │
+└───────────┬──────────────────────────────┘
+            │
+            ▼
+┌──────────────────────────────────────────┐
+│ Filter Logic (In-Memory)                 │
+│                                          │
+│ For each story in 10 results:           │
+│   searchable = name + body + slug        │
+│   if "omnichannel" in searchable:        │
+│     add to filtered_results              │
+│                                          │
+│ Result: 1 story matches                  │
+└───────────┬──────────────────────────────┘
+            │
+            ▼
+┌──────────────────────────────────────────┐
+│ Update Session Context                  │
+│ session_key: abc123                      │
+│ results: [Story5] (the matching one)    │
+└──────────────────────────────────────────┘
+            │
+            ▼
+    Display 1 story card to user
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ KEY DIFFERENCES: Search vs Refine                              │
+└─────────────────────────────────────────────────────────────────┘
+
+╔══════════════╦════════════════════════════╦═══════════════════════╗
+║ Aspect       ║ Search                     ║ Refine                ║
+╠══════════════╬════════════════════════════╬═══════════════════════╣
+║ Action       ║ "search"                   ║ "refine"              ║
+║ Data Source  ║ Storyblok API              ║ Session cache         ║
+║ Speed        ║ 1-3 seconds                ║ <100ms                ║
+║ Context Used ║ None                       ║ Previous results      ║
+║ Storage      ║ Stores new results         ║ Updates with filtered ║
+║ API Call     ║ Yes (external)             ║ No (in-memory)        ║
+╚══════════════╩════════════════════════════╩═══════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ SESSION CONTEXT LIFECYCLE                                       │
+└─────────────────────────────────────────────────────────────────┘
+
+1. NEW SEARCH
+   └─> Store all results in session
+       conversation_contexts[session_key] = [10 stories]
+
+2. REFINE
+   └─> Filter session results
+       conversation_contexts[session_key] = [1 story]
+
+3. ANOTHER REFINE
+   └─> Filter from current session (1 story)
+       conversation_contexts[session_key] = [0 or 1 story]
+
+4. NEW SEARCH (different topic)
+   └─> Replace session with new results
+       conversation_contexts[session_key] = [new 10 stories]
+
+5. CLEAR/TIMEOUT
+   └─> Remove from memory
+       del conversation_contexts[session_key]
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ TIMELINE: Your Example                                          │
+└─────────────────────────────────────────────────────────────────┘
+
+0ms ─────► User types: "find 10 marketing stories"
+           │
+1500ms ───► API returns 10 stories
+           │
+1501ms ───► Display 10 cards + Store in session
+           │
+5000ms ───► User types: "out of those, which mention omnichannel"
+           │
+5100ms ───► Retrieve 10 stories from session
+           │
+5200ms ───► Claude detects "refine" action
+           │
+5250ms ───► Filter 10 stories → 1 match
+           │
+5251ms ───► Display 1 card + Update session
+           │
+           ✅ COMPLETE (Total: ~5.3 seconds, refine took 250ms)
+
