@@ -350,7 +350,7 @@ class TestSessionContext:
         # Store search results
         stories = [
             StoryResult(body="", cursor=0, name="Article 1", slug="article-1", 
-                       story_id=1, content_type="article").dict()
+                       story_id=1, content_type="article").model_dump()
         ]
         conversation_contexts[session_key] = stories
         

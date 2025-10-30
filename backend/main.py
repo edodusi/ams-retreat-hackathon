@@ -268,7 +268,7 @@ async def conversation(request: ConversationRequest):
                         logger.warning(f">>> Returning all {len(search_results.stories)} stories without content_type filtering")
                 
                 # Store results for potential listing later
-                results_for_context = [story.dict() for story in search_results.stories]
+                results_for_context = [story.model_dump() for story in search_results.stories]
                 conversation_contexts[session_key] = results_for_context
                 
                 # Store analysis data
@@ -377,7 +377,7 @@ async def conversation(request: ConversationRequest):
                 logger.info(f">>> RESULTS ATTACHED TO RESPONSE: {len(search_results.stories)} stories")
                 
                 # Store results in session context for future refinement
-                results_for_context = [story.dict() for story in search_results.stories]
+                results_for_context = [story.model_dump() for story in search_results.stories]
                 conversation_contexts[session_key] = results_for_context
                 logger.info(f">>> Stored {len(results_for_context)} stories in session '{session_key}' for refinement")
                 logger.info(f">>> Session contexts now has {len(conversation_contexts)} sessions")
@@ -453,10 +453,10 @@ async def conversation(request: ConversationRequest):
             logger.info(f">>> Results object type: {type(conversation_response.results)}")
             logger.info(f">>> Results.stories type: {type(conversation_response.results.stories)}")
             if conversation_response.results.stories:
-                logger.info(f">>> First story sample: {conversation_response.results.stories[0].dict()}")
+                logger.info(f">>> First story sample: {conversation_response.results.stories[0].model_dump()}")
         
         # Serialize to dict to verify JSON structure
-        response_dict = conversation_response.dict()
+        response_dict = conversation_response.model_dump()
         logger.info(f">>> Serialized response keys: {response_dict.keys()}")
         if response_dict.get('results'):
             logger.info(f">>> Serialized results keys: {response_dict['results'].keys()}")

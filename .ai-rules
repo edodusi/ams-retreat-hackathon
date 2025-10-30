@@ -1,0 +1,114 @@
+# AI Assistant Rules for this Project
+
+## File Organization Rules
+
+### Documentation Files
+**Rule**: All documentation MUST be created in the `ai-output/docs/` folder.
+
+**Current State**: This project does NOT have a separate `docs/` folder. All documentation, whether polished user-facing docs or AI working notes, goes in `ai-output/docs/`.
+
+This includes:
+- User guides and tutorials
+- API reference documentation
+- Setup and installation guides
+- Feature documentation
+- Change logs and fix summaries
+- Debugging logs and status reports
+- Implementation notes from AI sessions
+- Session summaries and context logs
+- Historical tracking of changes
+- Any markdown files created during problem-solving
+
+**Exception**: Only `README.md` in the project root is allowed for the main project overview.
+
+**Future Note**: If a `docs/` folder is created in the future, it should be reserved for polished, production-ready documentation for end users, while `ai-output/docs/` would contain working notes and historical artifacts.
+
+### Automated Test Files (Real Tests)
+**Rule**: ONLY real automated tests go in the `tests/` folder.
+
+This is for **REAL** test files that are part of the testing infrastructure:
+- Python test files using pytest (test_*.py)
+- JavaScript/TypeScript test files (*.test.js, *.spec.js, *.test.ts, *.spec.ts)
+- Test configuration files (pytest.ini, jest.config.js, vitest.config.js)
+- Test fixtures and mock data files
+- `__init__.py` for Python test modules
+
+**These are actual automated tests run by test frameworks (pytest, jest, vitest, etc.).**
+
+**Does NOT include:**
+- Shell scripts for manual validation
+- Ad-hoc verification scripts  
+- One-off testing utilities created to verify fixes
+- Debug scripts created during troubleshooting
+
+### AI-Generated Validation & Testing Scripts
+**Rule**: All AI-generated validation scripts and debugging tools MUST be created in the `ai-output/validation/` folder.
+
+This includes:
+- Shell scripts for manual testing and validation (*.sh)
+- Quick verification scripts created to test fixes
+- Setup checking and verification scripts
+- Debug patches (*.patch)
+- Model checking utilities
+- One-off validation tools created during AI sessions
+- Test scripts created to validate specific issues
+- Fix scripts created during debugging sessions
+
+**These are AI-generated tools for manual validation, not automated test suite members.**
+
+**Exception**: The main `run.sh` script can remain in the root if it's the primary application launcher.
+
+## Project Structure
+
+```
+project-root/
+├── README.md              # Main project overview only
+├── requirements.txt       # Python dependencies
+├── run.sh                # Main application launcher
+├── backend/              # Backend application code
+├── frontend/             # Frontend application code
+├── tests/                # ✅ REAL automated tests only
+│   ├── test_*.py        # Pytest unit/integration tests
+│   ├── *.test.js        # Jest/Vitest tests
+│   └── pytest.ini       # Test configuration
+└── ai-output/            # 🤖 All AI-generated artifacts
+    ├── docs/            # ALL documentation (user docs & working notes)
+    │   ├── SETUP.md     # Setup guide
+    │   ├── API.md       # API reference
+    │   ├── FEATURES.md  # Feature documentation
+    │   ├── FIX-SUMMARY.md
+    │   ├── CHANGELOG.md
+    │   └── SESSION-*.md
+    └── validation/      # AI validation scripts & patches
+        ├── test_*.sh
+        ├── verify_*.py
+        └── *.patch
+```
+
+**Note**: There is NO separate `docs/` folder in this project. All documentation is in `ai-output/docs/`.
+
+## Decision Tree for File Placement
+
+**When creating a documentation file:**
+- Is this the main project README?
+  → YES: Update `README.md` in root
+  → NO: Create in `ai-output/docs/`
+
+**When creating a test/validation file:**
+- Is this a real automated test run by pytest/jest/vitest?
+  → YES: Create in `tests/`
+  → NO: Create in `ai-output/validation/`
+
+**When creating application code:**
+- Backend code → `backend/`
+- Frontend code → `frontend/`
+- Configuration files (`.env`, `requirements.txt`) → root
+
+## Compliance
+
+Following these rules ensures:
+- Clean separation between application code and AI artifacts
+- All documentation centralized in one location
+- Real automated tests separate from validation scripts
+- Easy cleanup of AI-generated content when needed
+- Professional project structure

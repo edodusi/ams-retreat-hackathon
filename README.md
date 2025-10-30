@@ -56,16 +56,45 @@ An accessible, voice-powered AI assistant that enables users to search and disco
 6. **Open the frontend:**
    Navigate to `http://localhost:8000/frontend/index.html`
 
+## 📁 Project Structure
+
+```
+ams-retreat-hackathon/
+├── backend/              # FastAPI backend application
+│   ├── main.py          # Main API endpoints
+│   ├── bedrock_client.py # AWS Bedrock integration
+│   ├── storyblok_client.py # Storyblok API client
+│   └── models.py        # Data models
+├── frontend/            # Frontend application
+│   └── index.html       # Alpine.js voice interface
+├── docs/                # 📘 End-user documentation
+│   ├── SETUP.md         # Setup guide
+│   ├── API.md           # API reference
+│   └── FEATURES.md      # Feature documentation
+├── tests/               # ✅ Automated tests (pytest)
+│   ├── test_main.py     # API endpoint tests
+│   ├── test_*.py        # Other test files
+│   └── pytest.ini       # Test configuration
+├── ai-output/           # 🤖 AI-generated artifacts
+│   ├── docs/           # Change logs, debug notes, session logs
+│   └── validation/     # Validation scripts & debugging tools
+├── requirements.txt     # Python dependencies
+├── run.sh              # Application launcher
+└── README.md           # This file
+```
+
+**Note**: The `ai-output/` folder contains AI-generated documentation and validation scripts, separate from production code and real tests.
+
 ## 📖 Documentation
 
-- **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration
-- **[API Documentation](docs/API.md)** - Complete API reference with examples
-- **[Features Guide](docs/FEATURES.md)** - All features and usage instructions
-- **[Project Specs](SPECS.md)** - Technical specifications and architecture
-- **[Development Guidelines](GUIDELINES.md)** - Guidelines for AI coding agents
+User-facing documentation is in the `docs/` folder (when it exists):
 
-## 🏗️ Architecture
+- **[Setup Guide](ai-output/docs/SETUP.md)** - Detailed installation and configuration
+- **[API Documentation](ai-output/docs/API.md)** - Complete API reference with examples
+- **[Features Guide](ai-output/docs/FEATURES.md)** - All features and usage instructions
+- **[Quick Start](ai-output/docs/QUICKSTART.md)** - Quick start guide
 
+See the [Documentation Index](ai-output/docs/README.md) for all available documentation. 
 ```
 ┌─────────────────────────────────────────┐
 │         Frontend (Alpine.js)            │
@@ -109,14 +138,30 @@ An accessible, voice-powered AI assistant that enables users to search and disco
 
 ## 🧪 Testing
 
+All tests are organized in the `tests/` folder. See [tests/README.md](tests/README.md) for details.
+
 ### Run Unit Tests
 ```bash
-pytest
+pytest tests/
 ```
 
 ### Test with Coverage
 ```bash
 pytest --cov=backend tests/
+```
+
+### Validation Scripts
+Validation and debugging scripts are in `ai-output/validation/`:
+
+```bash
+# Test server functionality
+./ai-output/validation/test_server.sh
+
+# Test frontend functionality
+./ai-output/validation/test_frontend.sh
+
+# Run comprehensive validation
+./ai-output/validation/final_test.sh
 ```
 
 ### Test API Endpoints
@@ -136,17 +181,7 @@ curl -X POST http://localhost:8000/api/conversation \
   }'
 ```
 
-### Debug Endpoints (when DEBUG=true)
-
-**Test Bedrock:**
-```bash
-curl http://localhost:8000/api/test-bedrock
-```
-
-**Test Storyblok:**
-```bash
-curl "http://localhost:8000/api/test-storyblok?term=test"
-```
+For more test examples, see [ai-output/docs/CURL_TESTS.md](ai-output/docs/CURL_TESTS.md).
 
 ## 🛠️ Tech Stack
 
