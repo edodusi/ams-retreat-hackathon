@@ -226,23 +226,43 @@ async def conversation(request: ConversationRequest):
                 search_results = await storyblok_client.search(term=search_term, limit=100)
                 logger.info(f">>> ANALYSIS FOUND {len(search_results.stories)} stories (total: {search_results.total})")
                 
-                # Note: Full story fetching disabled - requires CDN API token
-                # Content type filtering will be skipped if full stories can't be fetched
-                logger.info(f">>> Skipping full story fetch for analysis (requires CDN API access)")
+                # Fetch full story details for better analysis using Management API
+                if search_results.stories:
+                    for story in search_results.stories:
+                        try:
+                            full_story = await storyblok_client.get_story_by_id(story.story_id)
+                            if full_story:
+                                story.full_story = full_story
+                                # Extract content_type from content.component
+                                if full_story.get("content") and isinstance(full_story["content"], dict):
+                                    story.content_type = full_story["content"].get("component")
+                        except Exception as e:
+                            logger.warning(f"Could not fetch full story for ID {story.story_id}: {e}")
                 
                 # Filter by content_type if specified AND if stories have content_type populated
                 if content_type and search_results.stories:
                     # Check if any stories have content_type populated
                     stories_with_type = [s for s in search_results.stories if s.content_type]
                     if stories_with_type:
-                        initial_count = len(search_results.stories)
-                        logger.info(f">>> Filtering {initial_count} stories by content_type: {content_type}")
-                        filtered_stories = [
-                            s for s in search_results.stories 
-                            if s.content_type and content_type.lower() in s.content_type.lower()
-                        ]
-                        search_results.stories = filtered_stories
-                        logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                        # Get unique content types from results
+                        available_types = list(set([s.content_type for s in stories_with_type]))
+                        logger.info(f">>> Available content types: {available_types}")
+                        
+                        # Use Claude to map user's requested type to actual available type
+                        mapped_type = bedrock_client.map_content_type(content_type, available_types)
+                        
+                        if mapped_type:
+                            initial_count = len(search_results.stories)
+                            logger.info(f">>> Mapped user request '{content_type}' to '{mapped_type}'")
+                            logger.info(f">>> Filtering {initial_count} stories by mapped content_type: {mapped_type}")
+                            filtered_stories = [
+                                s for s in search_results.stories 
+                                if s.content_type and mapped_type.lower() in s.content_type.lower()
+                            ]
+                            search_results.stories = filtered_stories
+                            logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                        else:
+                            logger.warning(f">>> Could not map '{content_type}' to available types, returning all results")
                     else:
                         logger.warning(f">>> Cannot filter by content_type: no stories have content_type populated")
                         logger.warning(f">>> Returning all {len(search_results.stories)} stories without content_type filtering")
@@ -304,24 +324,51 @@ async def conversation(request: ConversationRequest):
                 search_results = await storyblok_client.search(term=search_term, limit=search_limit)
                 logger.info(f">>> SEARCH RETURNED {len(search_results.stories)} stories (total: {search_results.total})")
                 
-                # Note: Full story fetching disabled - requires CDN API token
-                # Stories will be returned with basic info from vsearch API only
-                logger.info(f">>> Returning {len(search_results.stories)} stories with basic info (full story fetch disabled)")
+                # Fetch full story details for each result using Management API
+                if search_results.stories:
+                    logger.info(f">>> Fetching full details for {len(search_results.stories)} stories")
+                    for story in search_results.stories:
+                        try:
+                            full_story = await storyblok_client.get_story_by_id(story.story_id)
+                            if full_story:
+                                story.full_story = full_story
+                                # Extract content_type from content.component
+                                if full_story.get("content") and isinstance(full_story["content"], dict):
+                                    story.content_type = full_story["content"].get("component")
+                                logger.debug(f"Fetched full story for ID {story.story_id}: type={story.content_type}")
+                        except Exception as e:
+                            logger.warning(f"Could not fetch full story for ID {story.story_id}: {e}")
+                            # Continue without full story data
                 
                 # Filter by content_type if specified AND if stories have content_type populated
                 if content_type and search_results.stories:
                     # Check if any stories have content_type populated
                     stories_with_type = [s for s in search_results.stories if s.content_type]
                     if stories_with_type:
-                        initial_count = len(search_results.stories)
-                        logger.info(f">>> Filtering {initial_count} stories by content_type: {content_type}")
-                        filtered_stories = [
-                            s for s in search_results.stories 
-                            if s.content_type and content_type.lower() in s.content_type.lower()
-                        ]
-                        search_results.stories = filtered_stories
-                        search_results.total = len(filtered_stories)
-                        logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                        # Get unique content types from results
+                        available_types = list(set([s.content_type for s in stories_with_type]))
+                        logger.info(f">>> Available content types: {available_types}")
+                        
+                        # Use Claude to map user's requested type to actual available type
+                        loop = asyncio.get_event_loop()
+                        mapped_type = await loop.run_in_executor(
+                            executor,
+                            lambda: bedrock_client.map_content_type(content_type, available_types)
+                        )
+                        
+                        if mapped_type:
+                            initial_count = len(search_results.stories)
+                            logger.info(f">>> Mapped user request '{content_type}' to '{mapped_type}'")
+                            logger.info(f">>> Filtering {initial_count} stories by mapped content_type: {mapped_type}")
+                            filtered_stories = [
+                                s for s in search_results.stories 
+                                if s.content_type and mapped_type.lower() in s.content_type.lower()
+                            ]
+                            search_results.stories = filtered_stories
+                            search_results.total = len(filtered_stories)
+                            logger.info(f">>> After content_type filter: {len(filtered_stories)} stories remain")
+                        else:
+                            logger.warning(f">>> Could not map '{content_type}' to available types, returning all results")
                     else:
                         logger.warning(f">>> Cannot filter by content_type: no stories have content_type populated")
                         logger.warning(f">>> Returning all {len(search_results.stories)} stories without content_type filtering")

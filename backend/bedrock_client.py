@@ -98,13 +98,14 @@ IMPORTANT: You MUST respond ONLY with valid JSON. No extra text before or after 
 When a user asks to search for NEW content (e.g., "find marketing stories", "show blog posts"):
 - Extract the key search terms from their query
 - Extract the number of results if specified
-- Extract content_type if specified (article, blog_post, page, etc.)
-- Return: {"action": "search", "term": "search term", "limit": 10, "content_type": "article", "response": "message"}
+- DO NOT include content_type unless absolutely necessary - search broadly by default
+- Return: {"action": "search", "term": "search term", "limit": 10, "response": "message"}
 
 Examples:
 - "find all marketing stories" → {"action": "search", "term": "marketing", "limit": 10, "response": "Here are the marketing stories I found:"}
-- "find the first 5 articles about marketing" → {"action": "search", "term": "marketing", "limit": 5, "content_type": "article", "response": "Here are 5 marketing articles:"}
-- "show me blog posts about AI" → {"action": "search", "term": "AI", "limit": 10, "content_type": "blog_post", "response": "Here are blog posts about AI:"}
+- "find the first 5 articles about marketing" → {"action": "search", "term": "marketing articles", "limit": 5, "response": "Here are 5 marketing articles:"}
+- "show me blog posts about AI" → {"action": "search", "term": "AI blog posts", "limit": 10, "response": "Here are blog posts about AI:"}
+- "find articles mentioning Drupal" → {"action": "search", "term": "Drupal", "limit": 10, "response": "Here are the stories mentioning Drupal:"}
 
 ### 2. ANALYZE/COUNT (action: "analyze")
 When a user wants to COUNT or ANALYZE content WITHOUT immediately listing results:
@@ -343,6 +344,77 @@ Always be helpful and accessible. Remember that some users may have disabilities
         except Exception as e:
             logger.error(f"Unexpected error in Bedrock client: {str(e)}")
             raise
+
+
+    def map_content_type(
+        self,
+        user_request: str,
+        available_content_types: List[str]
+    ) -> Optional[str]:
+        """
+        Use Claude to intelligently map user's requested content type to actual available types.
+        
+        Args:
+            user_request: User's requested content type (e.g., "article", "blog post")
+            available_content_types: List of actual content types found in stories
+            
+        Returns:
+            The best matching content type, or None if no good match
+        """
+        if not available_content_types:
+            return None
+            
+        prompt = f"""Given a user's content request and available content types, select the best match.
+
+User requested: "{user_request}"
+Available content types: {', '.join(available_content_types)}
+
+Which available content type best matches the user's request? Consider:
+- Semantic similarity (e.g., "article" might match "targeted_page" or "blog_post")
+- Common content type patterns
+- If no good match exists, respond with "none"
+
+Respond ONLY with the exact content type name from the available list, or "none".
+Do not include any explanation or additional text."""
+
+        try:
+            messages = [{
+                "role": "user",
+                "content": [{"text": prompt}]
+            }]
+            
+            response = self.client.converse(
+                modelId=self.model_id,
+                messages=messages,
+                inferenceConfig={
+                    "maxTokens": 50,
+                    "temperature": 0.3
+                }
+            )
+            
+            output = response.get("output", {})
+            message_data = output.get("message", {})
+            content_blocks = message_data.get("content", [])
+            
+            if content_blocks and len(content_blocks) > 0:
+                result = content_blocks[0].get("text", "").strip()
+                
+                # Check if result is in available types
+                if result in available_content_types:
+                    logger.info(f"Mapped '{user_request}' to '{result}'")
+                    return result
+                elif result.lower() == "none":
+                    logger.info(f"No good match for '{user_request}' in available types")
+                    return None
+                else:
+                    logger.warning(f"Claude returned '{result}' which is not in available types")
+                    return None
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error mapping content type: {e}")
+            return None
 
 
 # Singleton instance

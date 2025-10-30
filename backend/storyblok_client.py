@@ -141,16 +141,16 @@ class StoryblokClient:
         Raises:
             httpx.HTTPError: If the API request fails
         """
-        # Use the Content Delivery API to fetch full story
-        # CDN API requires token as query parameter, not header
-        url = f"{self.base_url}/v2/cdn/stories/{story_id}"
-        params = {"token": self.token}
+        # Use the Management API to fetch full story
+        # Management API uses Authorization header (same as vsearches)
+        url = f"{self.base_url}/v1/spaces/{self.space_id}/stories/{story_id}"
+        headers = self._build_headers()
         
         logger.info(f"Fetching full story details for ID: {story_id}")
         
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
-                response = await client.get(url, params=params)
+                response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 
                 data = response.json()
