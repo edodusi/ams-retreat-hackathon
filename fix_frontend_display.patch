@@ -1,0 +1,11 @@
+The issue is likely that Alpine.js is having trouble evaluating the condition.
+
+Replace line ~193:
+    x-show="message.role === 'assistant' && message.results && message.results.stories.length > 0"
+
+With a simpler condition:
+    x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
+
+Or even better, add a debug to see what's happening:
+    x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
+    x-init="if(message.results) console.log('[Alpine] Story count:', message.results.stories?.length)"

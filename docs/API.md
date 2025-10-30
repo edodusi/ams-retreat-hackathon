@@ -97,15 +97,20 @@ Main conversation endpoint for processing user messages and searching content.
   "results": {
     "stories": [
       {
-        "id": 12345,
+        "body": "A comprehensive guide to modern marketing tactics and trends for 2025. Learn the latest strategies...",
+        "cursor": 0,
         "name": "Marketing Strategy 2025",
-        "full_slug": "blog/marketing-strategy-2025",
-        "title": "Marketing Strategy 2025",
-        "description": "A comprehensive guide to modern marketing tactics and trends",
-        "content": {...},
-        "created_at": "2025-01-01T10:00:00Z",
-        "published_at": "2025-01-15T10:00:00Z",
-        "first_published_at": "2025-01-15T10:00:00Z"
+        "slug": "blog/marketing-strategy-2025",
+        "story_id": 12345,
+        "full_story": {
+          "id": 12345,
+          "name": "Marketing Strategy 2025",
+          "full_slug": "blog/marketing-strategy-2025",
+          "content": {...},
+          "created_at": "2025-01-01T10:00:00Z",
+          "published_at": "2025-01-15T10:00:00Z",
+          "first_published_at": "2025-01-15T10:00:00Z"
+        }
       }
     ],
     "total": 15
@@ -128,15 +133,12 @@ Main conversation endpoint for processing user messages and searching content.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | integer | Unique story identifier |
-| `name` | string | Story name |
-| `full_slug` | string | Complete URL slug/path |
-| `title` | string or null | Display title extracted from content |
-| `description` | string or null | Brief description (max 200 chars) |
-| `content` | object or null | Raw story content object |
-| `created_at` | string or null | ISO 8601 timestamp of creation |
-| `published_at` | string or null | ISO 8601 timestamp of publication |
-| `first_published_at` | string or null | ISO 8601 timestamp of first publication |
+| `body` | string | Story body/content as plain text from Strata API |
+| `cursor` | integer | Cursor position for pagination |
+| `name` | string | Story name/title |
+| `slug` | string | Story slug/path |
+| `story_id` | integer | Unique Storyblok story identifier |
+| `full_story` | object or null | Complete story data from Storyblok API (includes content, timestamps, etc.) |
 
 **Status Codes**
 - `200 OK` - Request successful
@@ -175,6 +177,57 @@ curl -X POST http://localhost:8000/api/conversation \
     ]
   }'
 ```
+
+---
+
+### Stories
+
+#### `GET /api/story/{story_id}`
+
+Fetch complete story details from Storyblok API by story ID.
+
+**Path Parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `story_id` | integer | Yes | Storyblok story ID |
+
+**Response**
+
+```json
+{
+  "status": "success",
+  "story": {
+    "id": 12345,
+    "name": "Marketing Strategy 2025",
+    "full_slug": "blog/marketing-strategy-2025",
+    "content": {
+      "component": "article",
+      "title": "Marketing Strategy 2025",
+      "body": "..."
+    },
+    "created_at": "2025-01-01T10:00:00Z",
+    "published_at": "2025-01-15T10:00:00Z",
+    "first_published_at": "2025-01-15T10:00:00Z"
+  }
+}
+```
+
+**Status Codes**
+- `200 OK` - Story found and returned
+- `404 Not Found` - Story with given ID not found
+- `500 Internal Server Error` - Server error
+
+**Example Request**
+
+```bash
+curl http://localhost:8000/api/story/12345
+```
+
+**Use Cases**
+- Fetch full story details when Strata search results don't include enough information
+- Load complete content structure for display
+- Access all story metadata and fields
 
 ---
 

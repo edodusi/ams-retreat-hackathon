@@ -22,18 +22,15 @@ class ConversationRequest(BaseModel):
 
 
 class StoryResult(BaseModel):
-    """A single story result from Storyblok."""
-    id: Optional[int] = Field(None, description="Story ID")
+    """A single story result from Storyblok Strata API."""
+    body: str = Field(..., description="Story body/content as text")
+    cursor: int = Field(..., description="Cursor for pagination")
     name: str = Field(..., description="Story name")
-    full_slug: str = Field(..., description="Full slug/path of the story")
-    content: Optional[dict] = Field(None, description="Story content")
-    created_at: Optional[str] = Field(None, description="Creation timestamp")
-    published_at: Optional[str] = Field(None, description="Publication timestamp")
-    first_published_at: Optional[str] = Field(None, description="First publication timestamp")
+    slug: str = Field(..., description="Story slug/path")
+    story_id: int = Field(..., description="Story ID")
     
-    # Fields for display
-    title: Optional[str] = Field(None, description="Display title")
-    description: Optional[str] = Field(None, description="Brief description")
+    # Additional fields for full story details (when fetched)
+    full_story: Optional[dict] = Field(None, description="Full story data from Storyblok API")
 
 
 class SearchResults(BaseModel):

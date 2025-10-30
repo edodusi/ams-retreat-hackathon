@@ -34,20 +34,18 @@ def mock_storyblok_results():
     return SearchResults(
         stories=[
             StoryResult(
-                id=1,
+                body="A comprehensive guide to modern marketing tactics for 2025. Learn the latest strategies and best practices.",
+                cursor=0,
                 name="Marketing Strategy 2025",
-                full_slug="blog/marketing-strategy-2025",
-                title="Marketing Strategy 2025",
-                description="A comprehensive guide to modern marketing tactics",
-                published_at="2025-01-15T10:00:00Z"
+                slug="blog/marketing-strategy-2025",
+                story_id=1
             ),
             StoryResult(
-                id=2,
+                body="Learn how to maximize your social media presence with proven best practices and expert tips.",
+                cursor=1,
                 name="Social Media Best Practices",
-                full_slug="blog/social-media-best-practices",
-                title="Social Media Best Practices",
-                description="Learn how to maximize your social media presence",
-                published_at="2025-01-20T10:00:00Z"
+                slug="blog/social-media-best-practices",
+                story_id=2
             )
         ],
         total=2
@@ -89,6 +87,7 @@ class TestConversationEndpoint:
         
         storyblok_mock = MagicMock()
         storyblok_mock.search = AsyncMock(return_value=mock_storyblok_results)
+        storyblok_mock.get_story_by_id = AsyncMock(return_value=None)  # Mock full story fetching
         mock_storyblok.return_value = storyblok_mock
         
         # Make request

@@ -155,6 +155,8 @@ async def conversation(request: ConversationRequest):
         response_text = claude_response.get("response", "")
         search_term = claude_response.get("term")
         
+        logger.info(f"Claude response - Action: {action}, Term: {search_term}, Message length: {len(response_text)}")
+        
         # Initialize response
         conversation_response = ConversationResponse(
             message=response_text,
@@ -163,22 +165,46 @@ async def conversation(request: ConversationRequest):
         
         # If action is search, query Storyblok (async httpx call)
         if action == "search" and search_term:
-            logger.info(f"Performing search with term: '{search_term}'")
+            logger.info(f">>> PERFORMING SEARCH with term: '{search_term}'")
             try:
                 search_results = await storyblok_client.search(term=search_term)
+                logger.info(f">>> SEARCH RETURNED {len(search_results.stories)} stories (total: {search_results.total})")
+                
+                # Fetch full story details for each result to provide better preview
+                if search_results.stories:
+                    logger.info(f">>> Fetching full details for {len(search_results.stories)} stories")
+                    for story in search_results.stories:
+                        try:
+                            full_story = await storyblok_client.get_story_by_id(story.story_id)
+                            if full_story:
+                                story.full_story = full_story
+                                logger.debug(f"Fetched full story for ID {story.story_id}")
+                        except Exception as e:
+                            logger.warning(f"Could not fetch full story for ID {story.story_id}: {e}")
+                            # Continue without full story data
+                
                 conversation_response.results = search_results
+                logger.info(f">>> RESULTS ATTACHED TO RESPONSE: {len(search_results.stories)} stories")
                 
                 # Enhance response message with result count
                 result_count = search_results.total
                 if result_count > 0:
-                    logger.info(f"Found {result_count} results")
+                    logger.info(f">>> SUCCESS: Found {result_count} results with full previews")
                 else:
                     logger.info("No results found")
                     conversation_response.message += "\n\nI couldn't find any matching content. Would you like to try a different search?"
                     
             except Exception as e:
-                logger.error(f"Storyblok search error: {str(e)}")
+                logger.error(f">>> STORYBLOK SEARCH ERROR: {str(e)}", exc_info=True)
                 conversation_response.message += "\n\nI encountered an issue searching for content. Please try again."
+        else:
+            if action == "search" and not search_term:
+                logger.warning(f">>> Search action requested but no search term provided!")
+            logger.info(f">>> NO SEARCH PERFORMED - Action: {action}, Has term: {bool(search_term)}")
+        
+        logger.info(f">>> FINAL RESPONSE: message length={len(conversation_response.message)}, has_results={conversation_response.results is not None}")
+        if conversation_response.results:
+            logger.info(f">>> RETURNING {len(conversation_response.results.stories)} stories in response")
         
         return conversation_response
         
@@ -225,6 +251,40 @@ async def test_storyblok(term: str = "test"):
         return {"status": "success", "results": results}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/story/{story_id}", tags=["Stories"])
+async def get_full_story(story_id: int):
+    """
+    Fetch full story details by ID.
+    
+    Args:
+        story_id: The Storyblok story ID
+        
+    Returns:
+        Full story data including content, metadata, etc.
+    """
+    try:
+        logger.info(f"Fetching full story for ID: {story_id}")
+        storyblok_client = get_storyblok_client()
+        story_data = await storyblok_client.get_story_by_id(story_id)
+        
+        if story_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Story with ID {story_id} not found"
+            )
+        
+        return {"status": "success", "story": story_data}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching story {story_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching story: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

@@ -190,7 +190,7 @@
                             
                             <!-- Story results (only for assistant messages) -->
                             <div 
-                                x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
+                                x-show="message.role === 'assistant' && message.results && message.results.stories.length > 0"
                                 class="space-y-3 mt-4"
                                 role="region"
                                 aria-label="Search results"
@@ -495,16 +495,6 @@
                         }
                         
                         const data = await response.json();
-                        
-                        // Debug logging
-                        console.log('[DEBUG] API Response:', data);
-                        console.log('[DEBUG] Has results?', !!data.results);
-                        if (data.results) {
-                            console.log('[DEBUG] Stories count:', data.results.stories?.length || 0);
-                            if (data.results.stories?.length > 0) {
-                                console.log('[DEBUG] First story:', data.results.stories[0]);
-                            }
-                        }
                         
                         // Add assistant response
                         this.messages.push({

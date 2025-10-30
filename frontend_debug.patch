@@ -1,0 +1,13 @@
+Find the line (around 192):
+    <div 
+        x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
+        class="space-y-3 mt-4"
+        role="region"
+        aria-label="Search results"
+    >
+
+Add after the opening div:
+        <template x-if="message.results">
+            <p x-data="{}" x-init="console.log('[Alpine] Results:', message.results); console.log('[Alpine] Stories:', message.results.stories?.length)" 
+               style="display:none"></p>
+        </template>

@@ -1,0 +1,9 @@
+Add after line 497 (const data = await response.json();):
+
+                        // Debug logging
+                        console.log('API Response:', data);
+                        console.log('Has results?', !!data.results);
+                        if (data.results) {
+                            console.log('Stories count:', data.results.stories?.length || 0);
+                            console.log('First story:', data.results.stories?.[0]);
+                        }

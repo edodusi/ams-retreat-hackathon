@@ -30,6 +30,8 @@ tags:
     description: Main conversation and search endpoints
   - name: Debug
     description: Debug and testing endpoints (DEBUG mode only)
+  - name: Stories
+    description: Story retrieval endpoints
 
 paths:
   /:
@@ -118,18 +120,26 @@ paths:
                     message: "I found 15 marketing articles. Here are the top results:"
                     results:
                       stories:
-                        - id: 12345
+                        - body: "A comprehensive guide to modern marketing tactics for 2025..."
+                          cursor: 0
                           name: "Marketing Strategy 2025"
-                          full_slug: "blog/marketing-strategy-2025"
-                          title: "Marketing Strategy 2025"
-                          description: "A comprehensive guide to modern marketing tactics"
-                          published_at: "2025-01-15T10:00:00Z"
-                        - id: 12346
+                          slug: "blog/marketing-strategy-2025"
+                          story_id: 12345
+                          full_story:
+                            id: 12345
+                            name: "Marketing Strategy 2025"
+                            content: {}
+                            published_at: "2025-01-15T10:00:00Z"
+                        - body: "Learn how to maximize your social media presence..."
+                          cursor: 1
                           name: "Social Media Best Practices"
-                          full_slug: "blog/social-media-best-practices"
-                          title: "Social Media Best Practices"
-                          description: "Learn how to maximize your social media presence"
-                          published_at: "2025-01-20T10:00:00Z"
+                          slug: "blog/social-media-best-practices"
+                          story_id: 12346
+                          full_story:
+                            id: 12346
+                            name: "Social Media Best Practices"
+                            content: {}
+                            published_at: "2025-01-20T10:00:00Z"
                       total: 15
                     conversation_id: null
                 chatOnly:
@@ -227,6 +237,57 @@ paths:
         '404':
           description: Debug mode disabled
 
+  /api/story/{story_id}:
+    get:
+      tags:
+        - Stories
+      summary: Get full story by ID
+      description: |
+        Fetch complete story details from Storyblok API by story ID.
+        Returns full story data including content, metadata, and all fields.
+      operationId: getFullStory
+      parameters:
+        - name: story_id
+          in: path
+          description: Storyblok story ID
+          required: true
+          schema:
+            type: integer
+            example: 12345
+      responses:
+        '200':
+          description: Story found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  story:
+                    type: object
+                    description: Complete story data from Storyblok
+        '404':
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Story with ID 12345 not found"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
 components:
   schemas:
     HealthCheck:
@@ -283,56 +344,58 @@ components:
 
     StoryResult:
       type: object
+      description: Story result from Storyblok Strata API
       required:
-        - id
+        - body
+        - cursor
         - name
-        - full_slug
+        - slug
+        - story_id
       properties:
-        id:
+        body:
+          type: string
+          description: Story body/content as text from Strata API
+          example: "A comprehensive guide to modern marketing tactics and trends for 2025..."
+        cursor:
           type: integer
-          description: Unique story identifier
-          example: 12345
+          description: Cursor position for pagination
+          example: 0
         name:
           type: string
-          description: Story name
+          description: Story name/title
           example: "Marketing Strategy 2025"
-        full_slug:
+        slug:
           type: string
-          description: Complete URL slug/path
+          description: Story slug/path
           example: "blog/marketing-strategy-2025"
-        title:
-          type: string
-          nullable: true
-          description: Display title extracted from content
-          example: "Marketing Strategy 2025"
-        description:
-          type: string
-          nullable: true
-          maxLength: 200
-          description: Brief description (max 200 characters)
-          example: "A comprehensive guide to modern marketing tactics and trends"
-        content:
+        story_id:
+          type: integer
+          description: Unique Storyblok story identifier
+          example: 12345
+        full_story:
           type: object
           nullable: true
-          description: Raw story content object
-        created_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: ISO 8601 timestamp of creation
-          example: "2025-01-01T10:00:00Z"
-        published_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: ISO 8601 timestamp of publication
-          example: "2025-01-15T10:00:00Z"
-        first_published_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: ISO 8601 timestamp of first publication
-          example: "2025-01-15T10:00:00Z"
+          description: |
+            Full story data fetched from Storyblok API (when available).
+            Contains complete story information including content, metadata, and all fields.
+          properties:
+            id:
+              type: integer
+              description: Story ID
+            name:
+              type: string
+              description: Story name
+            content:
+              type: object
+              description: Story content structure
+            published_at:
+              type: string
+              format: date-time
+              description: Publication timestamp
+            created_at:
+              type: string
+              format: date-time
+              description: Creation timestamp
 
     SearchResults:
       type: object

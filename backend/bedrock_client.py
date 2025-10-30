@@ -86,10 +86,15 @@ Your role:
 - Help users refine their searches through follow-up questions
 - Be concise but friendly and helpful
 
-When a user asks to search for content:
+IMPORTANT: You MUST respond ONLY with valid JSON. No extra text before or after the JSON.
+
+When a user asks to search for content (e.g., "find marketing stories", "show blog posts"):
 1. Extract the key search terms from their query
-2. Return a JSON object with the search term in this exact format:
-   {"action": "search", "term": "the search term", "response": "your conversational response"}
+2. Return ONLY this JSON format:
+   {"action": "search", "term": "the search term", "response": "I found some results for you."}
+
+Example for "find all marketing stories":
+{"action": "search", "term": "marketing", "response": "Here are the marketing stories I found:"}
 
 When refining searches (e.g., "only from this year", "show recent ones"):
 3. Consider the conversation context and modify the search accordingly
@@ -97,6 +102,8 @@ When refining searches (e.g., "only from this year", "show recent ones"):
 
 When just chatting or acknowledging results:
 5. Return: {"action": "chat", "response": "your response"}
+
+CRITICAL: Always use the "search" action when the user wants to find, search, or look for content. The response field should be brief - the actual results will be shown automatically.
 
 Always be helpful and accessible. Remember that some users may have disabilities and rely on voice interaction."""
 
@@ -150,6 +157,7 @@ Always be helpful and accessible. Remember that some users may have disabilities
 
             if content_blocks and len(content_blocks) > 0:
                 response_text = content_blocks[0].get("text", "")
+                logger.info(f"Raw Claude response: {response_text[:200]}...")
 
                 # Try to parse JSON from the response
                 try:
@@ -160,6 +168,8 @@ Always be helpful and accessible. Remember that some users may have disabilities
                         end_idx = response_text.rfind("}") + 1
                         json_str = response_text[start_idx:end_idx]
                         parsed_response = json.loads(json_str)
+                        
+                        logger.info(f"Parsed action: {parsed_response.get('action')}, term: {parsed_response.get('term')}")
 
                         return {
                             "action": parsed_response.get("action", "chat"),
@@ -167,10 +177,12 @@ Always be helpful and accessible. Remember that some users may have disabilities
                             "response": parsed_response.get("response", response_text),
                             "raw_response": response_text
                         }
-                except json.JSONDecodeError:
-                    logger.warning("Could not parse JSON from response, treating as chat")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Could not parse JSON from response: {e}, treating as chat")
+                    logger.debug(f"Failed to parse: {response_text}")
 
                 # Default to chat action if no JSON found
+                logger.warning("No valid JSON found in response, defaulting to chat action")
                 return {
                     "action": "chat",
                     "term": None,

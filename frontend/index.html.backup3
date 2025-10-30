@@ -190,7 +190,7 @@
                             
                             <!-- Story results (only for assistant messages) -->
                             <div 
-                                x-show="message.role === 'assistant' && message.results && message.results.stories && message.results.stories.length"
+                                x-show="message.role === 'assistant' && message.results && message.results.stories.length > 0"
                                 class="space-y-3 mt-4"
                                 role="region"
                                 aria-label="Search results"

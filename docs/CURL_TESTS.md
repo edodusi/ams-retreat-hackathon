@@ -402,3 +402,60 @@ For interactive testing with a web UI, visit:
 ---
 
 **Last Updated:** October 30, 2025
+## Story Retrieval Tests
+
+### Get Full Story by ID
+
+Fetch complete story details from Storyblok API:
+
+```bash
+curl http://localhost:8000/api/story/12345
+```
+
+**Expected Response (Success):**
+```json
+{
+  "status": "success",
+  "story": {
+    "id": 12345,
+    "name": "Marketing Strategy 2025",
+    "full_slug": "blog/marketing-strategy-2025",
+    "content": {
+      "component": "article",
+      "title": "Marketing Strategy 2025",
+      "body": "Full article content..."
+    },
+    "created_at": "2025-01-01T10:00:00Z",
+    "published_at": "2025-01-15T10:00:00Z",
+    "first_published_at": "2025-01-15T10:00:00Z"
+  }
+}
+```
+
+**Expected Response (Not Found - 404):**
+```json
+{
+  "detail": "Story with ID 99999 not found"
+}
+```
+
+**Use Cases:**
+- Get full story when search results don't have enough information
+- Load complete content structure for display
+- Access all story metadata
+
+**Example with real ID from search:**
+```bash
+# First, search for stories
+RESPONSE=$(curl -s -X POST http://localhost:8000/api/conversation \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Find marketing articles", "conversation_history": []}')
+
+# Extract first story_id (requires jq)
+STORY_ID=$(echo $RESPONSE | jq -r '.results.stories[0].story_id')
+
+# Fetch full story
+curl "http://localhost:8000/api/story/${STORY_ID}"
+```
+
+---
