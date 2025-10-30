@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Voice-enabled content discovery for Storyblok - Accessible AI assistant">
+    <title>Storyblok Voice Assistant</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <style>
+        /* Custom styles for accessibility */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        /* Focus indicators for keyboard navigation */
+        *:focus {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        
+        /* High contrast for accessibility */
+        .message-user {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .message-assistant {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            border: 1px solid #d1d5db;
+        }
+        
+        /* Story card styles */
+        .story-card {
+            background-color: white;
+            border: 2px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+        
+        .story-card:hover,
+        .story-card:focus-within {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Smooth scroll */
+        .chat-container {
+            scroll-behavior: smooth;
+        }
+        
+        /* Voice button animation */
+        .recording {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        /* Minimum touch target size */
+        button, a {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+    
+    <div x-data="voiceAssistant()" x-init="init()" class="flex flex-col h-screen">
+        
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200 px-4 py-4">
+            <div class="max-w-4xl mx-auto flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        Storyblok Voice Assistant
+                    </h1>
+                    <p class="text-sm text-gray-600 mt-1">
+                        Ask me to find content using your voice or keyboard
+                    </p>
+                </div>
+                
+                <!-- Status indicator -->
+                <div class="flex items-center gap-2">
+                    <span 
+                        class="inline-flex h-3 w-3 rounded-full"
+                        :class="isRecording ? 'bg-red-500' : (isProcessing ? 'bg-yellow-500' : 'bg-green-500')"
+                        role="status"
+                        :aria-label="isRecording ? 'Recording' : (isProcessing ? 'Processing' : 'Ready')"
+                    ></span>
+                    <span class="text-sm text-gray-600" x-text="isRecording ? 'Recording...' : (isProcessing ? 'Processing...' : 'Ready')"></span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Chat Container -->
+        <main 
+            class="flex-1 overflow-y-auto px-4 py-6 chat-container" 
+            id="chatContainer"
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation messages"
+        >
+            <div class="max-w-4xl mx-auto space-y-6">
+                
+                <!-- Welcome message -->
+                <div x-show="messages.length === 0" class="text-center py-12">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-2">
+                        Welcome! How can I help you today?
+                    </h2>
+                    <p class="text-gray-600 mb-4">
+                        Click the microphone button or type your message to search for content
+                    </p>
+                    <p class="text-sm text-gray-500">
+                        Try: "Find all marketing articles" or "Show me blog posts about technology"
+                    </p>
+                </div>
+                
+                <!-- Messages -->
+                <template x-for="(message, index) in messages" :key="index">
+                    <div 
+                        class="flex"
+                        :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                    >
+                        <div 
+                            class="max-w-2xl w-full"
+                            :class="message.role === 'assistant' ? 'space-y-4' : ''"
+                        >
+                            <!-- Message bubble -->
+                            <div 
+                                class="rounded-lg px-6 py-4"
+                                :class="message.role === 'user' ? 'message-user ml-auto max-w-lg' : 'message-assistant'"
+                                role="article"
+                                :aria-label="message.role === 'user' ? 'Your message' : 'Assistant response'"
+                            >
+                                <p class="text-base leading-relaxed" x-text="message.content"></p>
+                            </div>
+                            
+                            <!-- Story results (only for assistant messages) -->
+                            <div 
+                                x-show="message.role === 'assistant' && message.results && message.results.stories.length > 0"
+                                class="space-y-3 mt-4"
+                                role="region"
+                                aria-label="Search results"
+                            >
+                                <template x-for="story in message.results.stories" :key="story.id">
+                                    <div 
+                                        class="story-card rounded-lg p-5"
+                                        tabindex="0"
+                                        role="article"
+                                        :aria-label="'Story: ' + story.title"
+                                    >
+                                        <h3 class="text-lg font-semibold text-gray-900 mb-2" x-text="story.title || story.name"></h3>
+                                        <p 
+                                            class="text-gray-600 mb-3"
+                                            x-show="story.description"
+                                            x-text="story.description"
+                                        ></p>
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span class="text-gray-500" x-text="'/' + story.full_slug"></span>
+                                            <span 
+                                                class="text-blue-600 hover:text-blue-800 font-medium"
+                                                x-show="story.published_at"
+                                            >
+                                                Published: <span x-text="new Date(story.published_at).toLocaleDateString()"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Processing indicator -->
+                <div x-show="isProcessing" class="flex justify-start">
+                    <div class="message-assistant rounded-lg px-6 py-4 flex items-center gap-3">
+                        <div class="spinner"></div>
+                        <span class="text-gray-600">Thinking...</span>
+                    </div>
+                </div>
+                
+            </div>
+        </main>
+        
+        <!-- Input Area -->
+        <footer class="bg-white border-t border-gray-200 px-4 py-4">
+            <div class="max-w-4xl mx-auto">
+                
+                <!-- Error message -->
+                <div 
+                    x-show="errorMessage"
+                    class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    <p class="text-red-800 text-sm" x-text="errorMessage"></p>
+                </div>
+                
+                <!-- Transcript display (when recording) -->
+                <div 
+                    x-show="isRecording && transcript"
+                    class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <p class="text-blue-900 text-sm">
+                        <span class="font-semibold">Listening:</span>
+                        <span x-text="transcript"></span>
+                    </p>
+                </div>
+                
+                <!-- Input form -->
+                <form @submit.prevent="sendMessage" class="flex gap-3">
+                    
+                    <!-- Voice button -->
+                    <button
+                        type="button"
+                        @click="toggleVoiceInput"
+                        :disabled="!voiceSupported || isProcessing"
+                        class="flex-shrink-0 rounded-full p-4 transition-colors"
+                        :class="isRecording ? 'bg-red-500 hover:bg-red-600 recording' : 'bg-blue-600 hover:bg-blue-700'"
+                        :aria-label="isRecording ? 'Stop recording' : 'Start voice input'"
+                        :title="voiceSupported ? (isRecording ? 'Stop recording' : 'Start voice input') : 'Voice input not supported'"
+                    >
+                        <svg 
+                            class="w-6 h-6 text-white" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <path 
+                                x-show="!isRecording"
+                                stroke-linecap="round" 
+                                stroke-linejoin="round" 
+                                stroke-width="2" 
+                                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                            ></path>
+                            <path
+                                x-show="isRecording"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                            ></path>
+                        </svg>
+                    </button>
+                    
+                    <!-- Text input -->
+                    <input
+                        type="text"
+                        x-model="inputMessage"
+                        placeholder="Type your message or use voice input..."
+                        :disabled="isProcessing"
+                        class="flex-1 px-6 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        aria-label="Message input"
+                    />
+                    
+                    <!-- Send button -->
+                    <button
+                        type="submit"
+                        :disabled="!inputMessage.trim() || isProcessing"
+                        class="flex-shrink-0 px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                        aria-label="Send message"
+                    >
+                        <span x-show="!isProcessing">Send</span>
+                        <span x-show="isProcessing" class="flex items-center gap-2">
+                            <div class="spinner"></div>
+                            <span>Sending...</span>
+                        </span>
+                    </button>
+                </form>
+                
+                <!-- Voice support notice -->
+                <p 
+                    x-show="!voiceSupported"
+                    class="text-xs text-gray-500 mt-2 text-center"
+                    role="status"
+                >
+                    Voice input is not supported in your browser. Please use the text input.
+                </p>
+            </div>
+        </footer>
+    </div>
+    
+    <script>
+        function voiceAssistant() {
+            return {
+                messages: [],
+                inputMessage: '',
+                isRecording: false,
+                isProcessing: false,
+                voiceSupported: false,
+                recognition: null,
+                synthesis: null,
+                transcript: '',
+                errorMessage: '',
+                apiBaseUrl: 'http://localhost:8000',
+                
+                init() {
+                    // Check for Web Speech API support
+                    this.voiceSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+                    
+                    if (this.voiceSupported) {
+                        this.setupSpeechRecognition();
+                    }
+                    
+                    // Setup text-to-speech
+                    if ('speechSynthesis' in window) {
+                        this.synthesis = window.speechSynthesis;
+                    }
+                    
+                    console.log('Voice Assistant initialized', {
+                        voiceSupported: this.voiceSupported,
+                        ttsSupported: !!this.synthesis
+                    });
+                },
+                
+                setupSpeechRecognition() {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = true;
+                    this.recognition.interimResults = true;
+                    this.recognition.lang = 'en-US';
+                    
+                    this.recognition.onresult = (event) => {
+                        let interimTranscript = '';
+                        let finalTranscript = '';
+                        
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            const transcript = event.results[i][0].transcript;
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript + ' ';
+                            } else {
+                                interimTranscript += transcript;
+                            }
+                        }
+                        
+                        this.transcript = finalTranscript || interimTranscript;
+                        this.inputMessage = this.transcript;
+                    };
+                    
+                    this.recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        this.isRecording = false;
+                        if (event.error !== 'no-speech') {
+                            this.showError('Voice recognition error: ' + event.error);
+                        }
+                    };
+                    
+                    this.recognition.onend = () => {
+                        this.isRecording = false;
+                        if (this.inputMessage.trim()) {
+                            this.sendMessage();
+                        }
+                    };
+                },
+                
+                toggleVoiceInput() {
+                    if (!this.voiceSupported) return;
+                    
+                    if (this.isRecording) {
+                        this.recognition.stop();
+                        this.isRecording = false;
+                    } else {
+                        this.transcript = '';
+                        this.inputMessage = '';
+                        this.errorMessage = '';
+                        this.recognition.start();
+                        this.isRecording = true;
+                    }
+                },
+                
+                async sendMessage() {
+                    const message = this.inputMessage.trim();
+                    if (!message || this.isProcessing) return;
+                    
+                    // Clear error
+                    this.errorMessage = '';
+                    
+                    // Add user message
+                    this.messages.push({
+                        role: 'user',
+                        content: message
+                    });
+                    
+                    // Clear input
+                    this.inputMessage = '';
+                    this.transcript = '';
+                    
+                    // Scroll to bottom
+                    this.$nextTick(() => this.scrollToBottom());
+                    
+                    // Set processing state
+                    this.isProcessing = true;
+                    
+                    try {
+                        // Prepare conversation history (last 10 messages)
+                        const history = this.messages
+                            .slice(-11, -1)
+                            .map(msg => ({
+                                role: msg.role,
+                                content: msg.content
+                            }));
+                        
+                        // Call API
+                        const response = await fetch(`${this.apiBaseUrl}/api/conversation`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                message: message,
+                                conversation_history: history
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        
+                        // Add assistant response
+                        this.messages.push({
+                            role: 'assistant',
+                            content: data.message,
+                            results: data.results
+                        });
+                        
+                        // Speak the response if TTS is available
+                        if (this.synthesis && data.message) {
+                            this.speak(data.message);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                        this.showError('Failed to send message. Please check your connection and try again.');
+                        
+                        // Remove the user message if request failed
+                        this.messages.pop();
+                    } finally {
+                        this.isProcessing = false;
+                        this.$nextTick(() => this.scrollToBottom());
+                    }
+                },
+                
+                speak(text) {
+                    if (!this.synthesis) return;
+                    
+                    // Cancel any ongoing speech
+                    this.synthesis.cancel();
+                    
+                    // Remove result count info from speech (keep it visual only)
+                    const cleanText = text.split('\n\n')[0];
+                    
+                    const utterance = new SpeechSynthesisUtterance(cleanText);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+                    
+                    this.synthesis.speak(utterance);
+                },
+                
+                showError(message) {
+                    this.errorMessage = message;
+                    setTimeout(() => {
+                        this.errorMessage = '';
+                    }, 5000);
+                },
+                
+                scrollToBottom() {
+                    const container = document.getElementById('chatContainer');
+                    if (container) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
